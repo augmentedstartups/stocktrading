@@ -1,0 +1,10 @@
+---
+description: Use unique 6-digit ports for dev servers
+alwaysApply: true
+---
+
+# Dev Server Ports
+
+Do not use port `3000` for dev servers in this project. Always choose a unique high valid port before starting a local server.
+
+TCP ports must be within `0-65535`, so true 6-digit port numbers are not valid.

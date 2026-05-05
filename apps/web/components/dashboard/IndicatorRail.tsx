@@ -16,12 +16,9 @@ import {
   UsersThree,
   WaveSine,
   WaveTriangle,
-  SlidersHorizontal,
 } from "@phosphor-icons/react";
 import { useReducedMotion } from "framer-motion";
-import { useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Sheet } from "@/components/ui/sheet";
+import { useMemo } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -49,14 +46,6 @@ const DEFS: Array<{
   { id: "Council", label: "Council", hint: "Council verdict markers", Icon: UsersThree },
 ];
 
-const GROUPS: Record<string, string[]> = {
-  Trend: ["MA20", "MA50", "MA200", "EMA", "Bollinger", "VWAP"],
-  Momentum: ["RSI", "MACD"],
-  Volatility: ["ATR"],
-  Volume: ["OBV", "Volume"],
-  AI: ["News", "Sentiment", "RL", "Council"],
-};
-
 function PulseDot({ on }: { on: boolean }) {
   const reduce = useReducedMotion();
   if (!on) return null;
@@ -83,7 +72,6 @@ export function IndicatorRail({
   onToggleComplete: (next: string[]) => void | Promise<void>;
 }) {
   const active = useMemo(() => new Set(indicators), [indicators]);
-  const [sheet, setSheet] = useState(false);
 
   const toggle = async (id: string) => {
     if (disableToggle) return;
@@ -94,68 +82,36 @@ export function IndicatorRail({
     await Promise.resolve(onToggleComplete(arr));
   };
 
-  const chip = (d: (typeof DEFS)[number], rail = false) => {
-    const on = active.has(d.id);
-    const disabled = d.disabled || disableToggle;
-    const inner = (
-      <button
-        type="button"
-        disabled={disabled}
-        aria-label={d.label}
-        aria-pressed={on}
-        {...(rail ? { "data-testid": `indicator-rail-${d.id}` } : {})}
-        onClick={() => void toggle(d.id)}
-        className={cn(
-          "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-zinc-600 transition-colors active:scale-[0.96] active:translate-y-px",
-          on
-            ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] dark:bg-emerald-950/30 dark:text-emerald-200"
-            : "border-zinc-200/70 bg-white/50 backdrop-blur-md dark:border-zinc-700/70 dark:bg-zinc-900/40 dark:text-zinc-300",
-          disabled && "cursor-not-allowed opacity-40",
-        )}
-      >
-        <d.Icon size={22} weight="regular" />
-        <PulseDot on={on} />
-      </button>
-    );
-    return (
-      <Tooltip key={d.id} label={`${d.label}: ${d.hint}`}>
-        {inner}
-      </Tooltip>
-    );
-  };
-
   return (
-    <>
-      <div className="glass pointer-events-auto relative z-50 flex max-w-full items-center gap-2 rounded-2xl px-3 py-2 shadow-diffuse md:absolute md:bottom-4 md:left-4">
-        <div className="scrollbar-none flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 md:max-w-[calc(100%-8rem)]">
-          {DEFS.map((d) => chip(d, true))}
-        </div>
-        <Button
-          type="button"
-          variant="glass"
-          size="icon"
-          className="ml-auto shrink-0 rounded-xl"
-          aria-label="Open indicator layout sheet"
-          onClick={() => setSheet(true)}
-        >
-          <SlidersHorizontal size={22} weight="regular" />
-        </Button>
+    <div className="rounded-bento border border-zinc-200/70 bg-surface/80 p-3 shadow-diffuse dark:border-zinc-800/80">
+      <div className="flex flex-wrap gap-2">
+        {DEFS.map((d) => {
+          const on = active.has(d.id);
+          const disabled = d.disabled || disableToggle;
+          return (
+            <Tooltip key={d.id} label={`${d.label}: ${d.hint}`}>
+              <button
+                type="button"
+                disabled={disabled}
+                aria-label={d.label}
+                aria-pressed={on}
+                data-testid={`indicator-rail-${d.id}`}
+                onClick={() => void toggle(d.id)}
+                className={cn(
+                  "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-zinc-600 transition-colors active:scale-[0.96] active:translate-y-px",
+                  on
+                    ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] dark:bg-emerald-950/30 dark:text-emerald-200"
+                    : "border-zinc-200/70 bg-white/50 dark:border-zinc-700/70 dark:bg-zinc-900/40 dark:text-zinc-300",
+                  disabled && "cursor-not-allowed opacity-40",
+                )}
+              >
+                <d.Icon size={22} weight="regular" />
+                <PulseDot on={on} />
+              </button>
+            </Tooltip>
+          );
+        })}
       </div>
-
-      <Sheet open={sheet} onOpenChange={setSheet} title="Indicator layout">
-        <div className="flex flex-col gap-8">
-          {Object.entries(GROUPS).map(([name, ids]) => (
-            <section key={name}>
-              <p className="mb-3 font-display text-sm tracking-tight text-steel">
-                {name}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {DEFS.filter((d) => ids.includes(d.id)).map(chip)}
-              </div>
-            </section>
-          ))}
-        </div>
-      </Sheet>
-    </>
+    </div>
   );
 }

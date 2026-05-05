@@ -100,6 +100,7 @@ export function TickerDetail({ symbol }: { symbol: string }) {
           action={decision.action}
           confidence={decision.confidence}
           reasons={decision.reasons}
+          perModel={decision.perModel}
         />
       ) : null}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
