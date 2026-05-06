@@ -4,7 +4,7 @@ import { askOpenAICompatible } from "./openaiCompatible";
 export async function askDeepSeek(
   system: string,
   user: string,
-  model = process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
+  model = process.env.DEEPSEEK_MODEL ?? "deepseek-v4-pro",
 ): Promise<ProviderResult> {
   const baseURL =
     process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/v1";

@@ -7,7 +7,7 @@ export async function askGLM(
   model = process.env.ZAI_MODEL ?? "glm-5.1",
 ): Promise<ProviderResult> {
   const baseURL =
-    process.env.ZAI_BASE_URL ?? "https://open.bigmodel.cn/api/paas/v4/";
+    process.env.ZAI_BASE_URL ?? "https://api.z.ai/api/paas/v4";
   return askOpenAICompatible({
     provider: "zai",
     apiKey: process.env.ZAI_API_KEY,

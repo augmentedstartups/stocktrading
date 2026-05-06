@@ -28,6 +28,12 @@ export default function DashboardLayout({
               Watchlist
             </Link>
             <Link
+              href="/scan"
+              className="rounded-lg px-3 py-2 text-sm text-steel hover:bg-muted/80 hover:text-ink"
+            >
+              Scan
+            </Link>
+            <Link
               href="/settings"
               className="rounded-lg px-3 py-2 text-sm text-steel hover:bg-muted/80 hover:text-ink"
             >

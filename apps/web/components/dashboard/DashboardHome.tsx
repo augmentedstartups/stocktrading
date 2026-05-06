@@ -9,7 +9,6 @@ import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { BootstrapClient } from "./BootstrapClient";
-import { CouncilScanPanel, type ScanResult } from "./CouncilScanPanel";
 import { DecisionCard } from "./DecisionCard";
 import { IndicatorRail } from "./IndicatorRail";
 import { ModelBreakdown } from "./ModelBreakdown";
@@ -265,9 +264,6 @@ function LiveDashboard() {
   const [period, setPeriod] = useState<ChartPeriod>("10y");
   const [loading, setLoading] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
-  const [scanOpen, setScanOpen] = useState(false);
-  const [scanLoading, setScanLoading] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [localDecision, setLocalDecision] = useState<DecisionShape | null>(null);
 
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -368,29 +364,6 @@ function LiveDashboard() {
   const fav = useMutation(api.watchlist.toggleFavorite);
   const setIndicatorsMut = useMutation(api.settings.setIndicators);
 
-  const runScan = async () => {
-    const symbols = (wl ?? []).map((w: { symbol: string }) => w.symbol);
-    if (symbols.length === 0) return;
-    setScanOpen(true);
-    setScanLoading(true);
-    setScanResult(null);
-    try {
-      const r = await fetch("/api/council/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbols,
-          persist: true,
-          userId: uid ?? undefined,
-        }),
-      });
-      const j = (await r.json()) as ScanResult;
-      setScanResult(j);
-    } finally {
-      setScanLoading(false);
-    }
-  };
-
   return (
     <>
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -437,14 +410,6 @@ function LiveDashboard() {
               </Button>
               <Button type="button" variant="outline" onClick={() => setWatchlistOpen(true)}>
                 Watchlist ({wl?.length ?? 0})
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void runScan()}
-                disabled={scanLoading || !wl?.length}
-              >
-                {scanLoading ? "Scanning…" : "Scan watchlist"}
               </Button>
             </div>
             {chartError ? (
@@ -493,16 +458,6 @@ function LiveDashboard() {
           <NewsList items={news} />
         </aside>
       </div>
-      <Sheet open={scanOpen} onOpenChange={setScanOpen} title="Council scan">
-        <CouncilScanPanel
-          loading={scanLoading}
-          result={scanResult}
-          onSelect={(next) => {
-            setSymbol(next);
-            setScanOpen(false);
-          }}
-        />
-      </Sheet>
       <Sheet open={watchlistOpen} onOpenChange={setWatchlistOpen} title="Watchlist">
         <WatchlistTable
           items={wl ?? []}
