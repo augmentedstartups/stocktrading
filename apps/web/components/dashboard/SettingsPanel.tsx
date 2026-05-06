@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
+
+type CouncilModelMeta = { id: string; provider: string; label: string };
 
 export function SettingsPanel() {
   const hasConvex = Boolean(process.env.NEXT_PUBLIC_CONVEX_URL);
@@ -28,6 +30,20 @@ function SettingsInner() {
   const update = useMutation(api.settings.update);
 
   const [health, setHealth] = useState<string>("");
+  const [models, setModels] = useState<CouncilModelMeta[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void fetch("/api/council/models")
+      .then((r) => r.json())
+      .then((j: { models?: CouncilModelMeta[] }) => {
+        if (alive && Array.isArray(j.models)) setModels(j.models);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const providers = useMemo(
     () => [
@@ -140,6 +156,77 @@ function SettingsInner() {
               {label}
             </Button>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-bento border border-zinc-200/70 bg-surface p-8 shadow-diffuse dark:border-zinc-800/80">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-display text-lg text-ink">Council models</p>
+            <p className="mt-1 max-w-[55ch] text-sm text-zinc-600 dark:text-zinc-400">
+              Toggle which LLMs vote in the council. Selection is saved to Convex
+              and used by every council run.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                void update({ userId: uid, activeProviders: models.map((m) => m.id) })
+              }
+              disabled={models.length === 0}
+            >
+              Enable all
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void update({ userId: uid, activeProviders: [] })}
+            >
+              Disable all
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {models.length === 0 ? (
+            <p className="text-sm text-steel">Loading model registry…</p>
+          ) : null}
+          {models.map((m) => {
+            const on = (settings.activeProviders ?? []).includes(m.id);
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  const current = new Set(settings.activeProviders ?? []);
+                  if (on) current.delete(m.id);
+                  else current.add(m.id);
+                  void update({ userId: uid, activeProviders: Array.from(current) });
+                }}
+                className={
+                  "flex items-center justify-between gap-3 rounded-bento border px-4 py-3 text-left transition-colors " +
+                  (on
+                    ? "border-emerald-500/60 bg-emerald-500/10"
+                    : "border-zinc-200/70 hover:bg-muted/40 dark:border-zinc-800/80")
+                }
+              >
+                <span className="flex flex-col">
+                  <span className="text-sm font-medium text-ink">{m.label}</span>
+                  <span className="font-mono text-[11px] text-steel">{m.id}</span>
+                </span>
+                <span
+                  aria-hidden
+                  className={
+                    "h-3 w-3 rounded-full " +
+                    (on ? "bg-emerald-500" : "bg-zinc-300 dark:bg-zinc-700")
+                  }
+                />
+              </button>
+            );
+          })}
         </div>
       </section>
 

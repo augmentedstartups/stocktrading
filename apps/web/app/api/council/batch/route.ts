@@ -2,7 +2,7 @@ import { aggregateCouncil } from "@/lib/llm/aggregator";
 import { runCouncil } from "@/lib/llm/council";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
-import { insertDecision } from "@/lib/convexServer";
+import { getActiveProviders, insertDecision } from "@/lib/convexServer";
 import { mlGet } from "@/lib/ml";
 import { z } from "zod";
 
@@ -33,6 +33,7 @@ async function runOne(
   userHorizon: string | undefined,
   userId: string | undefined,
   persist: boolean,
+  activeProviders: string[] | undefined,
 ): Promise<Verdict | Failed> {
   try {
     const ind = await mlGet<{ snapshot: Record<string, unknown> }>(
@@ -84,6 +85,7 @@ async function runOne(
       sentiment,
       rl,
       userHorizon,
+      activeProviders,
     });
 
     const decision = aggregateCouncil({ symbol, results, rl });
@@ -147,9 +149,10 @@ export async function POST(req: Request) {
   const { symbols, userHorizon, userId, persist = true, concurrency = 2 } = parsed.data;
 
   const unique = Array.from(new Set(symbols.map((s) => s.trim()).filter(Boolean)));
+  const activeProviders = await getActiveProviders(userId);
   const results = await withConcurrency(
     unique,
-    (sym) => runOne(sym, userHorizon, userId, persist),
+    (sym) => runOne(sym, userHorizon, userId, persist, activeProviders),
     concurrency,
   );
 

@@ -7,6 +7,25 @@ export function getConvexServer(): ConvexHttpClient | null {
   return new ConvexHttpClient(url);
 }
 
+export async function getActiveProviders(
+  userId: string | undefined,
+): Promise<string[] | undefined> {
+  if (!userId) return undefined;
+  const client = getConvexServer();
+  if (!client) return undefined;
+  try {
+    const settings = (await client.query(api.settings.get, {
+      userId: userId as never,
+    })) as { activeProviders?: string[] } | null;
+    if (settings?.activeProviders && settings.activeProviders.length > 0) {
+      return settings.activeProviders;
+    }
+  } catch {
+    /* fall through */
+  }
+  return undefined;
+}
+
 export async function insertDecision(doc: {
   symbol: string;
   action: "buy" | "hold" | "sell";

@@ -2,7 +2,7 @@ import { aggregateCouncil } from "@/lib/llm/aggregator";
 import { runCouncil } from "@/lib/llm/council";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
-import { insertDecision } from "@/lib/convexServer";
+import { getActiveProviders, insertDecision } from "@/lib/convexServer";
 import { mlGet } from "@/lib/ml";
 import { z } from "zod";
 
@@ -63,6 +63,8 @@ export async function POST(req: Request) {
       ? { action: rlRaw.action as Action, confidence: rlRaw.confidence }
       : undefined;
 
+  const activeProviders = await getActiveProviders(userId);
+
   const results = await runCouncil({
     symbol,
     indicators: ind.snapshot ?? {},
@@ -70,6 +72,7 @@ export async function POST(req: Request) {
     sentiment,
     rl,
     userHorizon,
+    activeProviders,
   });
 
   const decision = aggregateCouncil({ symbol, results, rl });
