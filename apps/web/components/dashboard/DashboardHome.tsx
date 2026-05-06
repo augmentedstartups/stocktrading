@@ -9,9 +9,9 @@ import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { BootstrapClient } from "./BootstrapClient";
+import { CouncilModelPicker } from "./CouncilModelPicker";
 import { DecisionCard } from "./DecisionCard";
 import { IndicatorRail } from "./IndicatorRail";
-import { ModelBreakdown } from "./ModelBreakdown";
 import { NewsList } from "./NewsList";
 import { SentimentMeter } from "./SentimentMeter";
 import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
@@ -25,9 +25,28 @@ type PerModelRow = {
   action: Action;
   confidence: number;
   reason: string;
+  reasons?: string[];
   latencyMs: number;
   ok: boolean;
   error?: string;
+};
+
+type InputsUsed = {
+  technical: boolean;
+  fundamentals: boolean;
+  sentiment: boolean;
+  rl: boolean;
+  evidence?: {
+    technical?: Array<{ label: string; value: string }>;
+    fundamentals?: Array<{ label: string; value: string }>;
+    sentiment?: {
+      consensus?: number;
+      finbertScore?: number;
+      articles?: number;
+      headlines?: Array<{ title: string; url?: string }>;
+    };
+    rl?: { action: string; confidence: number; reason?: string };
+  };
 };
 
 type DecisionShape = {
@@ -35,6 +54,7 @@ type DecisionShape = {
   confidence: number;
   reasons: string[];
   perModel: PerModelRow[];
+  snapshot?: string;
 };
 
 type ChartPeriod = "1y" | "2y" | "5y" | "10y";
@@ -45,6 +65,52 @@ const CHART_PERIODS: Array<{ value: ChartPeriod; label: string }> = [
   { value: "5y", label: "5Y" },
   { value: "10y", label: "10Y" },
 ];
+
+function evidenceEntries(source: Record<string, unknown> | undefined, limit = 8) {
+  return Object.entries(source ?? {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .slice(0, limit)
+    .map(([label, value]) => ({
+      label,
+      value: typeof value === "number" ? Number(value.toFixed(4)).toString() : String(value),
+    }));
+}
+
+function inputsFromSnapshot(decision: DecisionShape | null): InputsUsed | null {
+  if (!decision?.snapshot) return null;
+  try {
+    const parsed = JSON.parse(decision.snapshot) as {
+      indicators?: Record<string, unknown>;
+      fundamentals?: Record<string, unknown>;
+      sentiment?: { consensus?: number; finbert?: { score?: number; n_articles?: number } } | null;
+      articles?: Array<{ title: string; url?: string }>;
+      rl?: { action: string; confidence: number; reason?: string };
+      inputsUsed?: InputsUsed;
+    };
+    if (parsed.inputsUsed) return parsed.inputsUsed;
+    return {
+      technical: Object.keys(parsed.indicators ?? {}).length > 0,
+      fundamentals: Object.keys(parsed.fundamentals ?? {}).length > 0,
+      sentiment: Boolean(parsed.sentiment),
+      rl: Boolean(parsed.rl),
+      evidence: {
+        technical: evidenceEntries(parsed.indicators),
+        fundamentals: evidenceEntries(parsed.fundamentals),
+        sentiment: parsed.sentiment
+          ? {
+              consensus: parsed.sentiment.consensus,
+              finbertScore: parsed.sentiment.finbert?.score,
+              articles: parsed.sentiment.finbert?.n_articles ?? parsed.articles?.length,
+              headlines: parsed.articles?.slice(0, 5),
+            }
+          : undefined,
+        rl: parsed.rl,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
 
 const OFFLINE_TICKERS = [
   { symbol: "AAPL", name: "Apple Inc." },
@@ -103,6 +169,8 @@ function DashboardHomeGate() {
 function OfflineDashboard() {
   const [symbol, setSymbol] = useState("AAPL");
   const [decision, setDecision] = useState<DecisionShape | null>(null);
+  const [inputsUsed, setInputsUsed] = useState<InputsUsed | null>(null);
+  const [activeProviders, setActiveProviders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [candles, setCandles] = useState<Candle[]>([]);
   const [series, setSeries] = useState<IndSeries[]>([]);
@@ -158,10 +226,15 @@ function OfflineDashboard() {
       const r = await fetch("/api/council", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol, persist: false }),
+        body: JSON.stringify({
+          symbol,
+          persist: false,
+          activeProviders: activeProviders.length > 0 ? activeProviders : undefined,
+        }),
       });
       const j = await r.json();
       setDecision(j.decision);
+      setInputsUsed(j.inputsUsed ?? null);
     } finally {
       setLoading(false);
     }
@@ -188,22 +261,31 @@ function OfflineDashboard() {
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <section className="space-y-6">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <TickerCombobox
             value={symbol}
             onChange={setSymbol}
             options={OFFLINE_TICKERS}
           />
+          <CouncilModelPicker
+            selected={activeProviders}
+            onChange={setActiveProviders}
+          />
           <Button type="button" onClick={() => void loadChart()}>
             Refresh data
           </Button>
-          <Button type="button" variant="secondary" onClick={() => void runCouncil()} disabled={loading}>
+          <Button type="button" variant="secondary" onClick={() => void runCouncil()} disabled={loading || activeProviders.length === 0}>
             {loading ? "Running council…" : "Run council"}
           </Button>
           <Button type="button" variant="outline" onClick={() => void deepSentiment()}>
             Deep sentiment
           </Button>
         </div>
+        {activeProviders.length === 0 && (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+            Select at least one model above to enable the council.
+          </p>
+        )}
         {chartError ? (
           <div className="rounded-bento border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
             {chartError}
@@ -225,14 +307,14 @@ function OfflineDashboard() {
             confidence={decision.confidence}
             reasons={decision.reasons}
             perModel={decision.perModel}
+            inputsUsed={inputsUsed ?? undefined}
           />
         ) : (
           <div className="rounded-bento border border-dashed border-zinc-300/80 p-8 text-sm text-steel dark:border-zinc-700/80">
             Run the council to synthesize a Buy/Hold/Sell memo for {symbol}.
           </div>
-        )}
-        {decision ? <ModelBreakdown rows={decision.perModel} /> : null}
-      </section>
+          )}
+        </section>
       <aside className="flex flex-col gap-8">
         {sentiment ? (
           <SentimentMeter finbertScore={sentiment.finbert.score} consensus={sentiment.consensus} articles={sentiment.finbert.n_articles} />
@@ -265,6 +347,14 @@ function LiveDashboard() {
   const [loading, setLoading] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [localDecision, setLocalDecision] = useState<DecisionShape | null>(null);
+  const [localInputsUsed, setLocalInputsUsed] = useState<InputsUsed | null>(null);
+  const [activeProviders, setActiveProviders] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (Array.isArray(settings?.activeProviders)) {
+      setActiveProviders(settings.activeProviders);
+    }
+  }, [settings?.activeProviders]);
 
   const [candles, setCandles] = useState<Candle[]>([]);
   const [series, setSeries] = useState<IndSeries[]>([]);
@@ -323,6 +413,7 @@ function LiveDashboard() {
   const remoteDecision = decisions?.[symbol] as DecisionShape | null | undefined;
 
   const decision: DecisionShape | null = localDecision ?? remoteDecision ?? null;
+  const decisionInputsUsed = localInputsUsed ?? inputsFromSnapshot(decision);
 
   const runCouncil = async () => {
     setLoading(true);
@@ -334,10 +425,12 @@ function LiveDashboard() {
           symbol,
           persist: true,
           userId: uid ?? undefined,
+          activeProviders,
         }),
       });
       const j = await r.json();
       setLocalDecision(j.decision);
+      setLocalInputsUsed(j.inputsUsed ?? null);
     } finally {
       setLoading(false);
     }
@@ -396,10 +489,15 @@ function LiveDashboard() {
                   ))}
                 </div>
               </div>
+              <CouncilModelPicker
+                selected={activeProviders}
+                onChange={setActiveProviders}
+                defaultIds={settings?.activeProviders ?? []}
+              />
               <Button type="button" onClick={() => void loadChart()}>
                 Refresh data
               </Button>
-              <Button type="button" variant="secondary" onClick={() => void runCouncil()} disabled={loading}>
+              <Button type="button" variant="secondary" onClick={() => void runCouncil()} disabled={loading || activeProviders.length === 0}>
                 {loading ? "Running council…" : "Run council"}
               </Button>
               <Button type="button" variant="outline" onClick={() => void deepSentiment()}>
@@ -412,6 +510,11 @@ function LiveDashboard() {
                 Watchlist ({wl?.length ?? 0})
               </Button>
             </div>
+            {activeProviders.length === 0 && (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                Select at least one model above to enable the council.
+              </p>
+            )}
             {chartError ? (
               <div className="mt-4 rounded-bento border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
                 {chartError}
@@ -438,13 +541,13 @@ function LiveDashboard() {
               confidence={decision.confidence}
               reasons={decision.reasons}
               perModel={decision.perModel}
+              inputsUsed={decisionInputsUsed ?? undefined}
             />
           ) : (
             <div className="rounded-bento border border-dashed border-zinc-300/80 p-8 text-sm text-steel dark:border-zinc-700/80">
               Run the council to synthesize a Buy/Hold/Sell memo for {symbol}.
             </div>
           )}
-          {decision ? <ModelBreakdown rows={decision.perModel} /> : null}
         </section>
 
         <aside className="flex flex-col gap-8">

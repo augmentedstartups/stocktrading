@@ -27,6 +27,7 @@ export const decisionSchema = z.object({
       action: actionSchema,
       confidence: z.number(),
       reason: z.string(),
+      reasons: z.array(z.string()).optional(),
       latencyMs: z.number(),
       ok: z.boolean(),
       error: z.string().optional(),

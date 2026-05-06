@@ -14,7 +14,18 @@ const bodySchema = z.object({
   userHorizon: z.string().optional(),
   userId: z.string().optional(),
   persist: z.boolean().optional(),
+  activeProviders: z.array(z.string()).optional(),
 });
+
+function evidenceEntries(source: Record<string, unknown> | undefined, limit = 8) {
+  return Object.entries(source ?? {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .slice(0, limit)
+    .map(([label, value]) => ({
+      label,
+      value: typeof value === "number" ? Number(value.toFixed(4)).toString() : String(value),
+    }));
+}
 
 export async function POST(req: Request) {
   const json = await req.json().catch(() => ({}));
@@ -22,7 +33,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return Response.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { symbol, userHorizon, userId, persist } = parsed.data;
+  const { symbol, userHorizon, userId, persist, activeProviders: bodyProviders } = parsed.data;
 
   const ind = await mlGet<{ snapshot: Record<string, unknown> }>(
     `/indicators?symbol=${encodeURIComponent(symbol)}`,
@@ -63,7 +74,16 @@ export async function POST(req: Request) {
       ? { action: rlRaw.action as Action, confidence: rlRaw.confidence }
       : undefined;
 
-  const activeProviders = await getActiveProviders(userId);
+  const activeProviders =
+    Array.isArray(bodyProviders)
+      ? bodyProviders
+      : await getActiveProviders(userId);
+  if (Array.isArray(activeProviders) && activeProviders.length === 0) {
+    return Response.json(
+      { error: "Select at least one council model." },
+      { status: 400 },
+    );
+  }
 
   const results = await runCouncil({
     symbol,
@@ -76,6 +96,28 @@ export async function POST(req: Request) {
   });
 
   const decision = aggregateCouncil({ symbol, results, rl });
+  const inputsUsed = {
+    technical: Object.keys(ind.snapshot ?? {}).length > 0,
+    fundamentals: Boolean(fundamentals && Object.keys(fundamentals).length > 0),
+    sentiment: Boolean(sentiment),
+    rl: Boolean(rl),
+    evidence: {
+      technical: evidenceEntries(ind.snapshot),
+      fundamentals: evidenceEntries(fundamentals),
+      sentiment: sentMl
+        ? {
+            consensus: sentiment?.consensus,
+            finbertScore: sentMl.aggregate.score,
+            articles: sentMl.aggregate.n_articles,
+            headlines: sentMl.articles.slice(0, 5).map((article) => ({
+              title: article.title,
+              url: article.url,
+            })),
+          }
+        : undefined,
+      rl,
+    },
+  };
 
   if (persist !== false) {
     await insertDecision({
@@ -86,10 +128,17 @@ export async function POST(req: Request) {
       reasons: decision.reasons,
       perModel: decision.perModel,
       rlInput: decision.rlInput,
-      snapshot: JSON.stringify({ indicators: ind.snapshot, sentiment }),
+      snapshot: JSON.stringify({
+        indicators: ind.snapshot,
+        fundamentals,
+        sentiment,
+        articles: sentMl?.articles.slice(0, 5) ?? [],
+        rl,
+        inputsUsed,
+      }),
       userId,
     });
   }
 
-  return Response.json({ decision, results });
+  return Response.json({ decision, results, inputsUsed });
 }

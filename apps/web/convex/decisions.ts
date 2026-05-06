@@ -66,6 +66,7 @@ export const insert = mutation({
         action: actionV,
         confidence: v.number(),
         reason: v.string(),
+        reasons: v.optional(v.array(v.string())),
         latencyMs: v.number(),
         ok: v.boolean(),
         error: v.optional(v.string()),

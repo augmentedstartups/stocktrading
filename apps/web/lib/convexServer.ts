@@ -17,7 +17,7 @@ export async function getActiveProviders(
     const settings = (await client.query(api.settings.get, {
       userId: userId as never,
     })) as { activeProviders?: string[] } | null;
-    if (settings?.activeProviders && settings.activeProviders.length > 0) {
+    if (Array.isArray(settings?.activeProviders)) {
       return settings.activeProviders;
     }
   } catch {
@@ -38,6 +38,7 @@ export async function insertDecision(doc: {
     action: "buy" | "hold" | "sell";
     confidence: number;
     reason: string;
+    reasons?: string[];
     latencyMs: number;
     ok: boolean;
     error?: string;

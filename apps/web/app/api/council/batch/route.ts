@@ -28,6 +28,16 @@ type Verdict = {
 
 type Failed = { symbol: string; ok: false; error: string };
 
+function evidenceEntries(source: Record<string, unknown> | undefined, limit = 8) {
+  return Object.entries(source ?? {})
+    .filter(([, value]) => value !== null && value !== undefined && value !== "")
+    .slice(0, limit)
+    .map(([label, value]) => ({
+      label,
+      value: typeof value === "number" ? Number(value.toFixed(4)).toString() : String(value),
+    }));
+}
+
 async function runOne(
   symbol: string,
   userHorizon: string | undefined,
@@ -89,6 +99,28 @@ async function runOne(
     });
 
     const decision = aggregateCouncil({ symbol, results, rl });
+    const inputsUsed = {
+      technical: Object.keys(ind.snapshot ?? {}).length > 0,
+      fundamentals: Boolean(fundamentals && Object.keys(fundamentals).length > 0),
+      sentiment: Boolean(sentiment),
+      rl: Boolean(rl),
+      evidence: {
+        technical: evidenceEntries(ind.snapshot),
+        fundamentals: evidenceEntries(fundamentals),
+        sentiment: sentMl
+          ? {
+              consensus: sentiment?.consensus,
+              finbertScore: sentMl.aggregate.score,
+              articles: sentMl.aggregate.n_articles,
+              headlines: sentMl.articles.slice(0, 5).map((article) => ({
+                title: article.title,
+                url: article.url,
+              })),
+            }
+          : undefined,
+        rl,
+      },
+    };
 
     if (persist) {
       await insertDecision({
@@ -99,7 +131,14 @@ async function runOne(
         reasons: decision.reasons,
         perModel: decision.perModel,
         rlInput: decision.rlInput,
-        snapshot: JSON.stringify({ indicators: ind.snapshot, sentiment }),
+        snapshot: JSON.stringify({
+          indicators: ind.snapshot,
+          fundamentals,
+          sentiment,
+          articles: sentMl?.articles.slice(0, 5) ?? [],
+          rl,
+          inputsUsed,
+        }),
         userId,
       });
     }
@@ -150,6 +189,12 @@ export async function POST(req: Request) {
 
   const unique = Array.from(new Set(symbols.map((s) => s.trim()).filter(Boolean)));
   const activeProviders = await getActiveProviders(userId);
+  if (Array.isArray(activeProviders) && activeProviders.length === 0) {
+    return Response.json(
+      { error: "Select at least one council model." },
+      { status: 400 },
+    );
+  }
   const results = await withConcurrency(
     unique,
     (sym) => runOne(sym, userHorizon, userId, persist, activeProviders),

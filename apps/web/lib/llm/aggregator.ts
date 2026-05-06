@@ -40,6 +40,7 @@ export function aggregateCouncil(opts: {
         action: "hold",
         confidence: 0,
         reason: "",
+        reasons: [],
         latencyMs: r.latencyMs,
         ok: false,
         error: r.error,
@@ -56,6 +57,7 @@ export function aggregateCouncil(opts: {
       action: v.action,
       confidence: v.confidence,
       reason: v.reasons[0] ?? "",
+      reasons: v.reasons,
       latencyMs: r.latencyMs,
       ok: true,
     });

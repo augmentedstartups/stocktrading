@@ -101,6 +101,7 @@ export default defineSchema({
         action: v.union(v.literal("buy"), v.literal("hold"), v.literal("sell")),
         confidence: v.number(),
         reason: v.string(),
+        reasons: v.optional(v.array(v.string())),
         latencyMs: v.number(),
         ok: v.boolean(),
         error: v.optional(v.string()),

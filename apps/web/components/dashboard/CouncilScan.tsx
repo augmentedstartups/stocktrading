@@ -69,6 +69,10 @@ function confidenceBadge(action: Action | undefined, confidence: number | undefi
 export function CouncilScan() {
   const u = useQuery(api.users.first);
   const uid = u?._id ?? null;
+  const settings = useQuery(
+    api.settings.get,
+    uid ? { userId: uid as Id<"users"> } : "skip",
+  );
   const wl = useQuery(
     api.watchlist.list,
     uid ? { userId: uid as Id<"users"> } : "skip",
@@ -78,6 +82,7 @@ export function CouncilScan() {
     uid ? { userId: uid as Id<"users"> } : "skip",
   );
   const tickers = useQuery(api.tickers.list);
+  const activeProviders = (settings?.activeProviders ?? []) as string[];
   const addToWatch = useMutation(api.watchlist.add);
   const removeFromWatch = useMutation(api.watchlist.remove);
 
@@ -230,10 +235,15 @@ export function CouncilScan() {
         <Button
           type="button"
           onClick={() => void runScan()}
-          disabled={scanning || watchlist.length === 0}
+          disabled={scanning || watchlist.length === 0 || activeProviders.length === 0}
         >
           {scanning ? "Scanning council…" : `Run council on ${watchlist.length} tickers`}
         </Button>
+        {activeProviders.length === 0 && (
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+            Select models in Settings to enable the council.
+          </p>
+        )}
       </header>
 
       {scanError ? (
@@ -334,6 +344,7 @@ export function CouncilScan() {
                     decision={d ?? null}
                     isOpen={isOpen}
                     running={runningSymbols.has(w.symbol)}
+                    runDisabled={activeProviders.length === 0}
                     onToggle={() => toggleExpand(w.symbol)}
                     onRemove={() => void removeSymbol(w.symbol)}
                     onRun={() => void runSingle(w.symbol)}
@@ -363,6 +374,7 @@ function FragmentRow({
   decision,
   isOpen,
   running,
+  runDisabled,
   onToggle,
   onRemove,
   onRun,
@@ -372,6 +384,7 @@ function FragmentRow({
   decision: DecisionDoc | null;
   isOpen: boolean;
   running: boolean;
+  runDisabled?: boolean;
   onToggle: () => void;
   onRemove: () => void;
   onRun: () => void;
@@ -429,7 +442,7 @@ function FragmentRow({
               variant="ghost"
               size="sm"
               onClick={onRun}
-              disabled={running}
+              disabled={running || runDisabled}
               aria-label={
                 decision ? `Re-run council on ${symbol}` : `Run council on ${symbol}`
               }

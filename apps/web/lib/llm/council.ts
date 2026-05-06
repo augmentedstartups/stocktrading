@@ -86,8 +86,7 @@ export async function runCouncil(ctx: {
   const system = councilSystemPrompt();
   const user = councilUserPrompt(ctx);
 
-  const hasExplicitSelection =
-    Array.isArray(ctx.activeProviders) && ctx.activeProviders.length > 0;
+  const hasExplicitSelection = Array.isArray(ctx.activeProviders);
   const selected = hasExplicitSelection
     ? COUNCIL_MODELS.filter((m) => ctx.activeProviders!.includes(m.id))
     : COUNCIL_MODELS;
