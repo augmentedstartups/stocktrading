@@ -26,11 +26,11 @@ export const bootstrap = mutation({
         risk: "balanced",
         horizon: "years",
         activeProviders: [
-          "openai/gpt-5.5",
           "anthropic/claude-opus-4-7",
+          "anthropic/claude-sonnet-4-6",
           "google/gemini-3.1-pro-preview",
-          "deepseek/deepseek-chat",
           "google/gemini-3.1-flash-lite-preview",
+          "deepseek/deepseek-chat",
         ],
         indicators: ["MA50", "MA200", "RSI", "Volume", "News"],
         theme: "system",

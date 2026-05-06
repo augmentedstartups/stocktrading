@@ -5,7 +5,6 @@ import { askGemini, askGeminiFlashLite } from "./providers/gemini";
 import { askGLM } from "./providers/glm";
 import { askKimi } from "./providers/kimi";
 import { askMiniMax } from "./providers/minimax";
-import { askOpenAI } from "./providers/openai";
 import type { ProviderResult } from "./providers/types";
 import type { SentimentSnapshot } from "./sentiment";
 
@@ -21,7 +20,6 @@ export async function runCouncil(ctx: {
   const user = councilUserPrompt(ctx);
   const max = Number(process.env.COUNCIL_MAX_MODELS ?? "5");
   const allRunners = [
-    () => askOpenAI(system, user),
     () => askAnthropic(system, user),
     () => askAnthropicSonnet(system, user),
     () => askGemini(system, user),

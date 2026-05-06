@@ -19,12 +19,15 @@ export async function POST(req: Request) {
   }
   const { query, symbol } = parsed.data;
 
-  const key = process.env.OPENAI_API_KEY;
+  const key = process.env.DEEPSEEK_API_KEY;
   if (!key) {
-    return Response.json({ error: "OPENAI_API_KEY missing" }, { status: 500 });
+    return Response.json({ error: "DEEPSEEK_API_KEY missing" }, { status: 500 });
   }
-  const openai = createOpenAI({ apiKey: key });
-  const model = openai(process.env.RESEARCH_MODEL ?? "gpt-5.5");
+  const client = createOpenAI({
+    apiKey: key,
+    baseURL: process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/v1",
+  });
+  const model = client(process.env.RESEARCH_MODEL ?? "deepseek-chat");
 
   const tools = {
     tavily_search: tool({

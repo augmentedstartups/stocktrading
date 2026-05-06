@@ -50,6 +50,24 @@ def load_parquet(symbol: str) -> Optional[pd.DataFrame]:
     return pd.read_parquet(p)
 
 
+def _period_days(period: str) -> Optional[int]:
+    if not period.endswith("y"):
+        return None
+    try:
+        return int(period[:-1]) * 365
+    except ValueError:
+        return None
+
+
+def apply_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    period_days = _period_days(period)
+    if period_days is None or len(df) == 0:
+        return df
+    latest = pd.to_datetime(df["date"].max())
+    cutoff = latest - pd.Timedelta(days=period_days)
+    return df[pd.to_datetime(df["date"]) >= cutoff]
+
+
 def ensure_fresh(symbol: str, period: str = "10y") -> pd.DataFrame:
     df = load_parquet(symbol)
     needs_refresh = df is None or len(df) == 0
@@ -57,6 +75,12 @@ def ensure_fresh(symbol: str, period: str = "10y") -> pd.DataFrame:
         latest = df["date"].max()
         if (datetime.now() - pd.to_datetime(latest)).days > 2:
             needs_refresh = True
+        period_days = _period_days(period)
+        if period_days is not None:
+            earliest = df["date"].min()
+            cached_days = (pd.to_datetime(latest) - pd.to_datetime(earliest)).days
+            if cached_days < period_days - 10:
+                needs_refresh = True
     if needs_refresh:
         df = fetch(symbol, period=period)
         save_parquet(symbol, df)

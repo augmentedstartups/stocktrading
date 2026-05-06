@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from pipeline.ingest import ensure_fresh, fetch, save_parquet
+from pipeline.ingest import apply_period, ensure_fresh, fetch, save_parquet
 
 router = APIRouter()
 
@@ -13,6 +13,7 @@ def get_prices(symbol: str = Query(...), period: str = "10y", limit: int = 0):
         df = ensure_fresh(symbol, period=period)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+    df = apply_period(df, period)
     if limit > 0:
         df = df.tail(limit)
     return {

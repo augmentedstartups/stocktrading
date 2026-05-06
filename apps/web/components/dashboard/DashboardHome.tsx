@@ -9,6 +9,7 @@ import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { BootstrapClient } from "./BootstrapClient";
+import { CouncilScanPanel, type ScanResult } from "./CouncilScanPanel";
 import { DecisionCard } from "./DecisionCard";
 import { IndicatorRail } from "./IndicatorRail";
 import { ModelBreakdown } from "./ModelBreakdown";
@@ -36,6 +37,15 @@ type DecisionShape = {
   reasons: string[];
   perModel: PerModelRow[];
 };
+
+type ChartPeriod = "1y" | "2y" | "5y" | "10y";
+
+const CHART_PERIODS: Array<{ value: ChartPeriod; label: string }> = [
+  { value: "1y", label: "1Y" },
+  { value: "2y", label: "2Y" },
+  { value: "5y", label: "5Y" },
+  { value: "10y", label: "10Y" },
+];
 
 const OFFLINE_TICKERS = [
   { symbol: "AAPL", name: "Apple Inc." },
@@ -252,8 +262,12 @@ function LiveDashboard() {
   const tickers = useQuery(api.tickers.list);
 
   const [symbol, setSymbol] = useState("AAPL");
+  const [period, setPeriod] = useState<ChartPeriod>("10y");
   const [loading, setLoading] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [localDecision, setLocalDecision] = useState<DecisionShape | null>(null);
 
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -279,10 +293,10 @@ function LiveDashboard() {
       setChartError(null);
       const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:8000";
       const encodedSymbol = encodeURIComponent(symbol);
-      const pr = await fetch(`${base}/prices?symbol=${encodedSymbol}&limit=400`);
+      const pr = await fetch(`${base}/prices?symbol=${encodedSymbol}&period=${period}`);
       const pj = await pr.json();
       setCandles(pj.candles ?? []);
-      const ir = await fetch(`${base}/indicators?symbol=${encodedSymbol}`);
+      const ir = await fetch(`${base}/indicators?symbol=${encodedSymbol}&period=${period}`);
       const ij = await ir.json();
       setSeries(ij.series ?? []);
       const sr = await fetch(`${base}/sentiment?symbol=${encodedSymbol}`);
@@ -298,7 +312,7 @@ function LiveDashboard() {
     } catch {
       setChartError("Market data service is unavailable.");
     }
-  }, [symbol]);
+  }, [period, symbol]);
 
   useEffect(() => {
     void loadChart();
@@ -354,12 +368,35 @@ function LiveDashboard() {
   const fav = useMutation(api.watchlist.toggleFavorite);
   const setIndicatorsMut = useMutation(api.settings.setIndicators);
 
+  const runScan = async () => {
+    const symbols = (wl ?? []).map((w: { symbol: string }) => w.symbol);
+    if (symbols.length === 0) return;
+    setScanOpen(true);
+    setScanLoading(true);
+    setScanResult(null);
+    try {
+      const r = await fetch("/api/council/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbols,
+          persist: true,
+          userId: uid ?? undefined,
+        }),
+      });
+      const j = (await r.json()) as ScanResult;
+      setScanResult(j);
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section className="space-y-8">
           <div className="rounded-bento border border-zinc-200/70 bg-surface p-6 shadow-diffuse dark:border-zinc-800/80 md:p-8">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <TickerCombobox
                 value={symbol}
                 onChange={setSymbol}
@@ -368,6 +405,24 @@ function LiveDashboard() {
                   ...tickerOptions,
                 ]}
               />
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium uppercase tracking-[0.18em] text-steel">
+                  Data range
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {CHART_PERIODS.map((option) => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      size="sm"
+                      variant={period === option.value ? "default" : "outline"}
+                      onClick={() => setPeriod(option.value)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
               <Button type="button" onClick={() => void loadChart()}>
                 Refresh data
               </Button>
@@ -382,6 +437,14 @@ function LiveDashboard() {
               </Button>
               <Button type="button" variant="outline" onClick={() => setWatchlistOpen(true)}>
                 Watchlist ({wl?.length ?? 0})
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void runScan()}
+                disabled={scanLoading || !wl?.length}
+              >
+                {scanLoading ? "Scanning…" : "Scan watchlist"}
               </Button>
             </div>
             {chartError ? (
@@ -430,6 +493,16 @@ function LiveDashboard() {
           <NewsList items={news} />
         </aside>
       </div>
+      <Sheet open={scanOpen} onOpenChange={setScanOpen} title="Council scan">
+        <CouncilScanPanel
+          loading={scanLoading}
+          result={scanResult}
+          onSelect={(next) => {
+            setSymbol(next);
+            setScanOpen(false);
+          }}
+        />
+      </Sheet>
       <Sheet open={watchlistOpen} onOpenChange={setWatchlistOpen} title="Watchlist">
         <WatchlistTable
           items={wl ?? []}

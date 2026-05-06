@@ -3,20 +3,21 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from pipeline.indicators import compute_all, latest_snapshot
-from pipeline.ingest import ensure_fresh
+from pipeline.ingest import apply_period, ensure_fresh
 
 router = APIRouter()
 
 
 @router.get("")
-def get_indicators(symbol: str = Query(...)):
+def get_indicators(symbol: str = Query(...), period: str = "10y"):
     try:
-        df = ensure_fresh(symbol)
+        df = ensure_fresh(symbol, period=period)
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+    df = apply_period(df, period)
     full = compute_all(df)
     snap = latest_snapshot(full)
-    series = full.dropna(subset=["ma200"]).tail(500)
+    series = full.dropna(subset=["ma200"])
     return {
         "symbol": symbol,
         "snapshot": snap,
