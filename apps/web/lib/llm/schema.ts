@@ -29,6 +29,7 @@ export const decisionSchema = z.object({
       reason: z.string(),
       reasons: z.array(z.string()).optional(),
       latencyMs: z.number(),
+      timestamp: z.string().optional(),
       ok: z.boolean(),
       error: z.string().optional(),
     }),

@@ -42,6 +42,7 @@ export function aggregateCouncil(opts: {
         reason: "",
         reasons: [],
         latencyMs: r.latencyMs,
+        timestamp: new Date().toISOString(),
         ok: false,
         error: r.error,
       });
@@ -59,6 +60,7 @@ export function aggregateCouncil(opts: {
       reason: v.reasons[0] ?? "",
       reasons: v.reasons,
       latencyMs: r.latencyMs,
+      timestamp: new Date().toISOString(),
       ok: true,
     });
   }

@@ -1,5 +1,5 @@
 import { aggregateCouncil } from "@/lib/llm/aggregator";
-import { runCouncil } from "@/lib/llm/council";
+import { COUNCIL_MODELS, runCouncil } from "@/lib/llm/council";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
 import { getActiveProviders, insertDecision } from "@/lib/convexServer";
@@ -74,10 +74,14 @@ export async function POST(req: Request) {
       ? { action: rlRaw.action as Action, confidence: rlRaw.confidence }
       : undefined;
 
-  const activeProviders =
+  const rawActiveProviders =
     Array.isArray(bodyProviders)
       ? bodyProviders
       : await getActiveProviders(userId);
+  const validIds = new Set(COUNCIL_MODELS.map((m) => m.id));
+  const activeProviders = Array.isArray(rawActiveProviders)
+    ? rawActiveProviders.filter((id) => validIds.has(id))
+    : rawActiveProviders;
   if (Array.isArray(activeProviders) && activeProviders.length === 0) {
     return Response.json(
       { error: "Select at least one council model." },
@@ -126,7 +130,17 @@ export async function POST(req: Request) {
       confidence: decision.confidence,
       horizon: decision.horizon,
       reasons: decision.reasons,
-      perModel: decision.perModel,
+      perModel: decision.perModel.map((m) => ({
+        provider: m.provider,
+        model: m.model,
+        action: m.action,
+        confidence: m.confidence,
+        reason: m.reason,
+        latencyMs: m.latencyMs,
+        timestamp: m.timestamp,
+        ok: m.ok,
+        error: m.error,
+      })),
       rlInput: decision.rlInput,
       snapshot: JSON.stringify({
         indicators: ind.snapshot,

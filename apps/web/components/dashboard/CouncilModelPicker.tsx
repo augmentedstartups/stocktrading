@@ -24,11 +24,26 @@ export function CouncilModelPicker({
     void fetch("/api/council/models")
       .then((r) => r.json())
       .then((j: { models?: CouncilModelMeta[] }) => {
-        if (alive && Array.isArray(j.models)) setModels(j.models);
+        if (alive && Array.isArray(j.models)) {
+          setModels(j.models);
+          // If we have defaultIds and no selected models yet, initialize them
+          if (defaultIds && defaultIds.length > 0 && selected.length === 0) {
+            const valid = new Set(j.models.map((m) => m.id));
+            const pruned = defaultIds.filter((id) => valid.has(id));
+            if (pruned.length > 0) onChange(pruned);
+          }
+        }
       })
       .catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [defaultIds]); // Run once when defaultIds is loaded
+
+  useEffect(() => {
+    if (models.length === 0) return;
+    const valid = new Set(models.map((m) => m.id));
+    const pruned = selected.filter((id) => valid.has(id));
+    if (pruned.length !== selected.length) onChange(pruned);
+  }, [models]); // Removed selected and onChange to avoid resetting state
 
   useEffect(() => {
     if (!open) return;
@@ -99,7 +114,17 @@ export function CouncilModelPicker({
               </button>
               <button
                 type="button"
-                onClick={() => onChange(defaultIds ?? [])}
+                onClick={() => onChange([])}
+                className="rounded-chip border border-zinc-200/70 px-2 py-0.5 text-[11px] text-steel hover:bg-muted/60 dark:border-zinc-800/80"
+              >
+                None
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const valid = new Set(models.map((m) => m.id));
+                  onChange((defaultIds ?? []).filter((id) => valid.has(id)));
+                }}
                 className="rounded-chip border border-zinc-200/70 px-2 py-0.5 text-[11px] text-steel hover:bg-muted/60 dark:border-zinc-800/80"
               >
                 Reset

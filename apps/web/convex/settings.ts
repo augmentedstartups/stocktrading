@@ -56,6 +56,18 @@ export const setIndicators = mutation({
   },
 });
 
+export const setActiveProviders = mutation({
+  args: { userId: v.id("users"), activeProviders: v.array(v.string()) },
+  handler: async (ctx, { userId, activeProviders }) => {
+    const s = await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (!s) throw new Error("settings missing");
+    await ctx.db.patch(s._id, { activeProviders });
+  },
+});
+
 export const update = mutation({
   args: {
     userId: v.id("users"),

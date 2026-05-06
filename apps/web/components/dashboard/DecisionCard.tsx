@@ -13,6 +13,7 @@ type CouncilMode = {
   reason: string;
   reasons?: string[];
   latencyMs?: number;
+  timestamp?: string;
   ok: boolean;
   error?: string;
 };
@@ -185,6 +186,17 @@ export function DecisionCard({
                     {r.latencyMs ? (
                       <span className="number text-[11px] text-steel/60">
                         {r.latencyMs}ms
+                      </span>
+                    ) : null}
+                    {r.timestamp ? (
+                      <span className="number text-[11px] text-steel/60">
+                        • {new Date(r.timestamp).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          second: "2-digit",
+                        })}
                       </span>
                     ) : null}
                   </div>

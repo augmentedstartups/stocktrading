@@ -27,6 +27,7 @@ type PerModelRow = {
   reason: string;
   reasons?: string[];
   latencyMs: number;
+  timestamp?: string;
   ok: boolean;
   error?: string;
 };
@@ -74,6 +75,16 @@ function evidenceEntries(source: Record<string, unknown> | undefined, limit = 8)
       label,
       value: typeof value === "number" ? Number(value.toFixed(4)).toString() : String(value),
     }));
+}
+
+async function readJsonBody<T>(response: Response): Promise<T | null> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
 }
 
 function inputsFromSnapshot(decision: DecisionShape | null): InputsUsed | null {
@@ -223,6 +234,7 @@ function OfflineDashboard() {
   const runCouncil = async () => {
     setLoading(true);
     try {
+      setChartError(null);
       const r = await fetch("/api/council", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -232,7 +244,11 @@ function OfflineDashboard() {
           activeProviders: activeProviders.length > 0 ? activeProviders : undefined,
         }),
       });
-      const j = await r.json();
+      const j = await readJsonBody<{ decision?: DecisionShape; inputsUsed?: InputsUsed; error?: string }>(r);
+      if (!r.ok || !j?.decision) {
+        setChartError(j?.error ?? "Council run failed.");
+        return;
+      }
       setDecision(j.decision);
       setInputsUsed(j.inputsUsed ?? null);
     } finally {
@@ -351,7 +367,7 @@ function LiveDashboard() {
   const [activeProviders, setActiveProviders] = useState<string[]>([]);
 
   useEffect(() => {
-    if (Array.isArray(settings?.activeProviders)) {
+    if (Array.isArray(settings?.activeProviders) && settings.activeProviders.length > 0) {
       setActiveProviders(settings.activeProviders);
     }
   }, [settings?.activeProviders]);
@@ -418,6 +434,7 @@ function LiveDashboard() {
   const runCouncil = async () => {
     setLoading(true);
     try {
+      setChartError(null);
       const r = await fetch("/api/council", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -428,7 +445,11 @@ function LiveDashboard() {
           activeProviders,
         }),
       });
-      const j = await r.json();
+      const j = await readJsonBody<{ decision?: DecisionShape; inputsUsed?: InputsUsed; error?: string }>(r);
+      if (!r.ok || !j?.decision) {
+        setChartError(j?.error ?? "Council run failed.");
+        return;
+      }
       setLocalDecision(j.decision);
       setLocalInputsUsed(j.inputsUsed ?? null);
     } finally {
@@ -456,6 +477,14 @@ function LiveDashboard() {
 
   const fav = useMutation(api.watchlist.toggleFavorite);
   const setIndicatorsMut = useMutation(api.settings.setIndicators);
+  const setProvidersMut = useMutation(api.settings.setActiveProviders);
+
+  const setActiveProvidersAndSave = (next: string[]) => {
+    setActiveProviders(next);
+    if (uid) {
+      void setProvidersMut({ userId: uid, activeProviders: next });
+    }
+  };
 
   return (
     <>
@@ -491,7 +520,7 @@ function LiveDashboard() {
               </div>
               <CouncilModelPicker
                 selected={activeProviders}
-                onChange={setActiveProviders}
+                onChange={setActiveProvidersAndSave}
                 defaultIds={settings?.activeProviders ?? []}
               />
               <Button type="button" onClick={() => void loadChart()}>

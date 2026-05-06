@@ -5,8 +5,9 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "pnpm --filter web dev",
-    "dev:ml": "cd services/ml && uv run uvicorn api.main:app --reload --host 0.0.0.0 --port 8000",
+    "dev:ml": "cd services/ml && .venv/bin/uvicorn api.main:app --reload --host 0.0.0.0 --port 8000",
     "dev:convex": "cd apps/web && pnpm convex dev",
+    "start": "bash dev.sh",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "test": "vitest run --config tests/vitest.config.ts",

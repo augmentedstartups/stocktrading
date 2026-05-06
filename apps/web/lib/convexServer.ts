@@ -40,6 +40,7 @@ export async function insertDecision(doc: {
     reason: string;
     reasons?: string[];
     latencyMs: number;
+    timestamp?: string;
     ok: boolean;
     error?: string;
   }>;

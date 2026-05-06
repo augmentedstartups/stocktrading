@@ -45,6 +45,16 @@ function SettingsInner() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!uid || !settings || models.length === 0) return;
+    const valid = new Set(models.map((m) => m.id));
+    const stored = settings.activeProviders ?? [];
+    const pruned = stored.filter((id) => valid.has(id));
+    if (pruned.length !== stored.length) {
+      void update({ userId: uid, activeProviders: pruned });
+    }
+  }, [uid, settings, models, update]);
+
   const providers = useMemo(
     () => [
       { name: "OpenAI", key: "server-side env" },
