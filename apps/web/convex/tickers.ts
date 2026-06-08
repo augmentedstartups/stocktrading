@@ -57,6 +57,7 @@ export const seedPresets = mutation({
       { symbol: "META", name: "Meta Platforms", market: "US", currency: "USD", sector: "Technology", logoUrl: "https://logo.clearbit.com/meta.com" },
       { symbol: "AMZN", name: "Amazon.com", market: "US", currency: "USD", sector: "Consumer Discretionary", logoUrl: "https://logo.clearbit.com/amazon.com" },
       { symbol: "NVDA", name: "NVIDIA Corp.", market: "US", currency: "USD", sector: "Semiconductors", logoUrl: "https://logo.clearbit.com/nvidia.com" },
+      { symbol: "INTC", name: "Intel Corp.", market: "US", currency: "USD", sector: "Semiconductors", logoUrl: "https://logo.clearbit.com/intel.com" },
       { symbol: "TSLA", name: "Tesla Inc.", market: "US", currency: "USD", sector: "Consumer Discretionary", logoUrl: "https://logo.clearbit.com/tesla.com" },
       { symbol: "SPY", name: "SPDR S&P 500 ETF", market: "INDEX", currency: "USD" },
       { symbol: "QQQ", name: "Invesco QQQ Trust", market: "INDEX", currency: "USD" },

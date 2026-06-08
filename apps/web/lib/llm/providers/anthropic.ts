@@ -6,7 +6,7 @@ import type { ProviderResult } from "./types";
 export async function askAnthropic(
   system: string,
   user: string,
-  model = process.env.ANTHROPIC_COUNCIL_MODEL ?? "claude-opus-4-7",
+  model = process.env.ANTHROPIC_COUNCIL_MODEL ?? "claude-opus-4-8",
 ): Promise<ProviderResult> {
   const t0 = Date.now();
   const key = process.env.ANTHROPIC_API_KEY;

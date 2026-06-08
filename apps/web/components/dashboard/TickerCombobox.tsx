@@ -17,6 +17,7 @@ export function TickerCombobox({
   className?: string;
 }) {
   const listboxId = useId();
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
   const normalizedValue = value.toUpperCase();
@@ -41,6 +42,10 @@ export function TickerCombobox({
   }, [normalizedQuery, unique]);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (!open) setQuery(value);
   }, [open, value]);
 
@@ -54,7 +59,8 @@ export function TickerCombobox({
   return (
     <div className="relative flex min-w-[12rem] items-center">
       <input
-        value={open ? query : value}
+        value={mounted ? (open ? query : value) : value}
+        suppressHydrationWarning
         onChange={(e) => {
           setQuery(e.target.value.toUpperCase());
           setOpen(true);

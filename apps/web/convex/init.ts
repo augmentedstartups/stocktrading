@@ -26,14 +26,14 @@ export const bootstrap = mutation({
         risk: "balanced",
         horizon: "years",
         activeProviders: [
-          "anthropic/claude-opus-4-7",
+          "local/google/gemma-4-12b",
+          "anthropic/claude-opus-4-8",
           "anthropic/claude-sonnet-4-6",
           "google/gemini-3.1-pro-preview",
-          "google/gemini-3.1-flash-lite-preview",
-          "deepseek/deepseek-v4-pro",
+          "google/gemini-3.5-flash",
           "moonshot/kimi-k2.6",
           "zai/glm-5.1",
-          "minimax/MiniMax-M2.7",
+          "minimax/MiniMax-M3",
         ],
         indicators: ["MA50", "MA200", "RSI", "Volume", "News"],
         theme: "system",
@@ -97,6 +97,14 @@ export const bootstrap = mutation({
         logoUrl: "https://logo.clearbit.com/nvidia.com",
       },
       {
+        symbol: "INTC",
+        name: "Intel Corp.",
+        market: "US",
+        currency: "USD",
+        sector: "Semiconductors",
+        logoUrl: "https://logo.clearbit.com/intel.com",
+      },
+      {
         symbol: "TSLA",
         name: "Tesla Inc.",
         market: "US",
@@ -143,7 +151,7 @@ export const bootstrap = mutation({
       if (!ex) await ctx.db.insert("tickers", p);
     }
 
-    const defaults = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "SPY", "QQQ", "NPN.JO"];
+    const defaults = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY", "QQQ", "NPN.JO"];
     for (const symbol of defaults) {
       const ex = await ctx.db
         .query("watchlist")

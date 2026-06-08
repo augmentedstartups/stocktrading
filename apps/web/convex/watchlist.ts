@@ -54,7 +54,7 @@ export const toggleFavorite = mutation({
 export const seedDefault = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    const defaults = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "SPY", "QQQ", "NPN.JO"];
+    const defaults = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY", "QQQ", "NPN.JO"];
     for (const symbol of defaults) {
       const ex = await ctx.db
         .query("watchlist")

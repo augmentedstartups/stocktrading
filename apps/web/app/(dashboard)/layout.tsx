@@ -3,6 +3,8 @@ import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 
 export const dynamic = "force-dynamic";
 
+const APP_VERSION = "v0.1.4";
+
 export default function DashboardLayout({
   children,
 }: {
@@ -17,12 +19,18 @@ export default function DashboardLayout({
               Council
             </Link>
             <span className="font-mono text-[11px] uppercase tracking-widest text-steel">
-              Quant desk
+              Quant desk · {APP_VERSION}
             </span>
           </div>
           <nav className="flex items-center gap-2 md:gap-4">
             <Link
               href="/"
+              className="rounded-lg px-3 py-2 text-sm text-steel hover:bg-muted/80 hover:text-ink"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/watchlist"
               className="rounded-lg px-3 py-2 text-sm text-steel hover:bg-muted/80 hover:text-ink"
             >
               Watchlist

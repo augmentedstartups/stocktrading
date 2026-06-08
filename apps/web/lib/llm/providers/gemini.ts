@@ -57,6 +57,6 @@ export async function askGeminiFlashLite(
   user: string,
 ): Promise<ProviderResult> {
   const model =
-    process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-3.1-flash-lite-preview";
+    process.env.GEMINI_FLASH_MODEL ?? process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-3.5-flash";
   return askGemini(system, user, model);
 }

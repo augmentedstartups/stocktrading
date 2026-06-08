@@ -102,7 +102,7 @@ export function TickerChart({
       if (!active.has(toggle)) return;
       const ln = c.addSeries(LineSeries, { color, lineWidth: 2, priceScaleId: scale });
       const pts = series
-        .filter((r) => typeof r[key] === "number")
+        .filter((r) => typeof r[key] === "number" && Number.isFinite(r[key]))
         .map((r) => ({ time: r.t as never, value: r[key] as number }));
       ln.setData(pts);
     };
@@ -150,7 +150,7 @@ export function TickerChart({
       c.priceScale("rsi").applyOptions({ scaleMargins: { top: 0.05, bottom: 0.55 } });
       rsiLine.setData(
         series
-          .filter((r) => typeof r.rsi === "number")
+          .filter((r) => typeof r.rsi === "number" && Number.isFinite(r.rsi))
           .map((r) => ({ time: r.t as never, value: r.rsi as number })),
       );
     }
@@ -169,12 +169,12 @@ export function TickerChart({
       c.priceScale("macd").applyOptions({ scaleMargins: { top: 0.55, bottom: 0.05 } });
       m.setData(
         series
-          .filter((r) => typeof r.macd === "number")
+          .filter((r) => typeof r.macd === "number" && Number.isFinite(r.macd))
           .map((r) => ({ time: r.t as never, value: r.macd as number })),
       );
       s.setData(
         series
-          .filter((r) => typeof r.macd_signal === "number")
+          .filter((r) => typeof r.macd_signal === "number" && Number.isFinite(r.macd_signal))
           .map((r) => ({ time: r.t as never, value: r.macd_signal as number })),
       );
     }

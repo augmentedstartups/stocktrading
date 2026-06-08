@@ -1,0 +1,302 @@
+name: stockanalysis
+version: "1.0"
+description: >
+  Unified control plane for the Council stock analysis dashboard.
+  Query market data, run multi-model council verdicts, manage watchlists and settings,
+  and persist decisions. All operations go through the control API on port 54827.
+
+service:
+  base_url: http://127.0.0.1:54827
+  health: GET /health
+  spec: GET /spec
+  dependencies:
+    web_dashboard: http://127.0.0.1:53947
+    ml_backend: http://127.0.0.1:58123
+    convex: optional — required for watchlist, settings, and persisted decisions
+
+startup:
+  all_services: pnpm start
+  control_only: pnpm dev:control
+  requires:
+    - ML backend on port 58123 (pnpm dev:ml)
+    - Next.js dashboard on port 53947 (pnpm dev)
+    - Convex dev sync for persistence (pnpm dev:convex) — optional for read-only analysis
+
+agent_instructions: |
+  You control the Council stock analysis dashboard programmatically.
+  1. Call GET /health to confirm the control service is up.
+  2. Call POST /dashboard/bootstrap once per session if Convex persistence is needed.
+  3. Use market endpoints (/prices, /indicators, /fundamentals, /sentiment) for raw data.
+  4. Use POST /council for a full multi-LLM buy/hold/sell verdict on one symbol.
+  5. Use POST /council/batch to scan multiple symbols concurrently.
+  6. Use POST /research for autonomous web research with tool use.
+  7. Use dashboard endpoints to read/write watchlist, settings, and decision history.
+  8. Set persist:false on council calls when you only need ephemeral analysis.
+  9. Pass activeProviders in council body to override model selection without changing settings.
+
+actions:
+  health_check:
+    method: GET
+    path: /health
+    returns: service status and upstream URLs
+
+  get_spec:
+    method: GET
+    path: /spec
+    returns: this YAML document
+
+  bootstrap_dashboard:
+    method: POST
+    path: /dashboard/bootstrap
+    description: Seed default user, settings, tickers, and watchlist in Convex
+    body: {}
+    returns:
+      userId: string
+      bootstrapped: true
+
+  list_council_models:
+    method: GET
+    path: /council/models
+    returns:
+      models: array of { id, provider, label }
+
+  run_council:
+    method: POST
+    path: /council
+    description: Run all active LLM council models and aggregate a verdict
+    body:
+      symbol: string — required, e.g. AAPL
+      userHorizon: string — optional, e.g. weeks
+      userId: string — optional Convex user id for settings lookup
+      persist: boolean — default true; set false for ephemeral runs
+      activeProviders: string[] — optional override of council model ids
+    returns:
+      decision:
+        symbol: string
+        action: buy | hold | sell
+        confidence: number 0-1
+        horizon: days | weeks | months | years
+        reasons: string[]
+        perModel: array of per-model verdicts
+      results: raw per-model outputs
+      inputsUsed: technical, fundamentals, sentiment, rl evidence flags
+
+  run_council_batch:
+    method: POST
+    path: /council/batch
+    description: Scan up to 40 symbols with configurable concurrency
+    body:
+      symbols: string[] — required, 1-40 symbols
+      userHorizon: string — optional
+      userId: string — optional
+      persist: boolean — default true
+      concurrency: integer — 1-6, default 2
+    returns:
+      counts: { total, buy, hold, sell, failed }
+      buys: sorted verdicts
+      sells: sorted verdicts
+      holds: sorted verdicts
+      errors: failed symbols
+
+  deep_research:
+    method: POST
+    path: /research
+    description: Autonomous equity research agent with web search tools
+    body:
+      query: string — required research question
+      symbol: string — optional primary ticker context
+    returns:
+      text: research memo
+      steps: number of tool steps used
+
+  deep_sentiment:
+    method: POST
+    path: /sentiment/deep
+    description: LLM-enhanced news sentiment beyond FinBERT
+    body:
+      symbol: string — required
+      name: string — optional company name hint
+    returns:
+      snapshot: merged sentiment object
+      articles: news articles with FinBERT scores
+
+  get_prices:
+    method: GET
+    path: /prices
+    query:
+      symbol: string — required
+      period: string — default 10y
+      limit: integer — optional candle limit
+    returns:
+      symbol: string
+      rows: integer
+      candles: array of { t, o, h, l, c, v }
+
+  refresh_prices:
+    method: POST
+    path: /prices/refresh
+    query:
+      symbol: string — required
+      period: string — default 10y
+
+  get_indicators:
+    method: GET
+    path: /indicators
+    query:
+      symbol: string — required
+      period: string — default 10y
+    returns:
+      symbol: string
+      snapshot: latest indicator values (MA, RSI, MACD, BB, ATR, OBV, VWAP)
+      series: time series for charting
+
+  get_fundamentals:
+    method: GET
+    path: /fundamentals
+    query:
+      symbol: string — required
+    returns:
+      symbol: string
+      info: sector, PE, marketCap, beta, etc.
+
+  get_sentiment:
+    method: GET
+    path: /sentiment
+    query:
+      symbol: string — required
+      name: string — optional
+      limit: integer — default 25
+    returns:
+      symbol: string
+      articles: news with FinBERT scores
+      aggregate: { score, pos, neu, neg, n_articles }
+      sources: string[]
+
+  rl_predict:
+    method: GET
+    path: /rl/predict
+    query:
+      symbol: string — required
+    returns:
+      action: buy | hold | sell
+      confidence: number
+
+  rl_train:
+    method: POST
+    path: /rl/train
+    query:
+      symbol: string — required
+      timesteps: integer — default 30000
+
+  run_backtest:
+    method: GET
+    path: /backtest
+    query:
+      symbol: string — required
+      strategy: string — default buyhold
+
+  get_watchlist:
+    method: GET
+    path: /dashboard/watchlist
+    query:
+      userId: string — optional
+    returns:
+      userId: string
+      watchlist: array of { symbol, favorite, addedAt }
+
+  add_to_watchlist:
+    method: POST
+    path: /dashboard/watchlist
+    body:
+      symbol: string — required
+      userId: string — optional
+
+  remove_from_watchlist:
+    method: DELETE
+    path: /dashboard/watchlist
+    body:
+      symbol: string — required
+      userId: string — optional
+
+  get_settings:
+    method: GET
+    path: /dashboard/settings
+    query:
+      userId: string — optional
+    returns:
+      userId: string
+      settings:
+        markets: US | JSE | INDEX[]
+        categories: string[]
+        frequency: eod | 15min | realtime
+        risk: conservative | balanced | aggressive
+        horizon: days | weeks | months | years
+        activeProviders: council model id[]
+        indicators: string[]
+        theme: light | dark | system
+
+  update_settings:
+    method: PATCH
+    path: /dashboard/settings
+    body:
+      userId: string — optional
+      markets: optional
+      categories: optional
+      frequency: optional
+      risk: optional
+      horizon: optional
+      activeProviders: optional
+      theme: optional
+      indicators: optional
+
+  list_decisions:
+    method: GET
+    path: /dashboard/decisions
+    query:
+      userId: string — optional
+      symbol: string — optional, returns latest for symbol
+      limit: integer — default 50
+
+workflows:
+  analyze_single_ticker:
+    steps:
+      - GET /indicators?symbol={SYMBOL}
+      - GET /fundamentals?symbol={SYMBOL}
+      - GET /sentiment?symbol={SYMBOL}
+      - GET /rl/predict?symbol={SYMBOL}
+      - POST /council { "symbol": "{SYMBOL}", "persist": false }
+
+  scan_watchlist:
+    steps:
+      - GET /dashboard/watchlist
+      - POST /council/batch { "symbols": ["..."], "concurrency": 3 }
+
+  full_research_memo:
+    steps:
+      - POST /research { "query": "...", "symbol": "AAPL" }
+      - POST /sentiment/deep { "symbol": "AAPL" }
+      - POST /council { "symbol": "AAPL" }
+
+council_model_ids:
+  - anthropic/claude-opus-4-7
+  - anthropic/claude-sonnet-4-6
+  - google/gemini-3.1-pro-preview
+  - google/gemini-3.1-flash-lite-preview
+  - moonshot/kimi-k2.6
+  - zai/glm-5.1
+  - minimax/MiniMax-M2.7
+
+examples:
+  health: curl -s http://127.0.0.1:54827/health
+  council: |
+    curl -s -X POST http://127.0.0.1:54827/council \
+      -H 'Content-Type: application/json' \
+      -d '{"symbol":"NVDA","persist":false}'
+  batch: |
+    curl -s -X POST http://127.0.0.1:54827/council/batch \
+      -H 'Content-Type: application/json' \
+      -d '{"symbols":["AAPL","MSFT","NVDA"],"concurrency":2}'
+  watchlist_add: |
+    curl -s -X POST http://127.0.0.1:54827/dashboard/watchlist \
+      -H 'Content-Type: application/json' \
+      -d '{"symbol":"TSLA"}'

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
@@ -130,6 +130,7 @@ const OFFLINE_TICKERS = [
   { symbol: "META", name: "Meta Platforms" },
   { symbol: "AMZN", name: "Amazon.com" },
   { symbol: "NVDA", name: "NVIDIA Corp." },
+  { symbol: "INTC", name: "Intel Corp." },
   { symbol: "TSLA", name: "Tesla Inc." },
   { symbol: "SPY", name: "SPDR S&P 500 ETF" },
   { symbol: "QQQ", name: "Invesco QQQ Trust" },
@@ -201,10 +202,15 @@ function OfflineDashboard() {
   ]);
   const active = useMemo(() => new Set(railIndicators), [railIndicators]);
 
+  useEffect(() => {
+    setDecision(null);
+    setInputsUsed(null);
+  }, [symbol]);
+
   const loadChart = useCallback(async () => {
     try {
       setChartError(null);
-      const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:8000";
+      const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:58123";
       const encodedSymbol = encodeURIComponent(symbol);
       const pr = await fetch(`${base}/prices?symbol=${encodedSymbol}&limit=400`);
       const pj = await pr.json();
@@ -359,12 +365,23 @@ function LiveDashboard() {
   const tickers = useQuery(api.tickers.list);
 
   const [symbol, setSymbol] = useState("AAPL");
+  const defaultedRef = useRef(false);
   const [period, setPeriod] = useState<ChartPeriod>("10y");
   const [loading, setLoading] = useState(false);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [localDecision, setLocalDecision] = useState<DecisionShape | null>(null);
   const [localInputsUsed, setLocalInputsUsed] = useState<InputsUsed | null>(null);
   const [activeProviders, setActiveProviders] = useState<string[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    setLocalDecision(null);
+    setLocalInputsUsed(null);
+  }, [symbol]);
 
   useEffect(() => {
     if (Array.isArray(settings?.activeProviders) && settings.activeProviders.length > 0) {
@@ -393,7 +410,7 @@ function LiveDashboard() {
   const loadChart = useCallback(async () => {
     try {
       setChartError(null);
-      const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:8000";
+      const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:58123";
       const encodedSymbol = encodeURIComponent(symbol);
       const pr = await fetch(`${base}/prices?symbol=${encodedSymbol}&period=${period}`);
       const pj = await pr.json();
@@ -421,8 +438,11 @@ function LiveDashboard() {
   }, [loadChart]);
 
   useEffect(() => {
-    if (wl && wl.length && !wl.find((x: { symbol: string }) => x.symbol === symbol)) {
-      setSymbol(wl[0].symbol);
+    if (wl && wl.length && !defaultedRef.current) {
+      defaultedRef.current = true;
+      if (!wl.find((x: { symbol: string }) => x.symbol === symbol)) {
+        setSymbol(wl[0].symbol);
+      }
     }
   }, [wl, symbol]);
 
@@ -536,14 +556,14 @@ function LiveDashboard() {
                 <Link href={`/ticker/${encodeURIComponent(symbol)}`}>Ticker detail</Link>
               </Button>
               <Button type="button" variant="outline" onClick={() => setWatchlistOpen(true)}>
-                Watchlist ({wl?.length ?? 0})
+                <span suppressHydrationWarning>Watchlist ({hydrated ? (wl?.length ?? 0) : 0})</span>
               </Button>
             </div>
-            {activeProviders.length === 0 && (
+            {hydrated && activeProviders.length === 0 ? (
               <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
                 Select at least one model above to enable the council.
               </p>
-            )}
+            ) : null}
             {chartError ? (
               <div className="mt-4 rounded-bento border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100">
                 {chartError}

@@ -1,5 +1,5 @@
 import { aggregateCouncil } from "@/lib/llm/aggregator";
-import { runCouncil } from "@/lib/llm/council";
+import { COUNCIL_MODELS, DEFAULT_COUNCIL_PROVIDER_ID, runCouncil } from "@/lib/llm/council";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
 import { getActiveProviders, insertDecision } from "@/lib/convexServer";
@@ -14,6 +14,7 @@ const bodySchema = z.object({
   userHorizon: z.string().optional(),
   userId: z.string().optional(),
   persist: z.boolean().optional(),
+  activeProviders: z.array(z.string()).optional(),
   concurrency: z.number().int().min(1).max(6).optional(),
 });
 
@@ -185,19 +186,31 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return Response.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { symbols, userHorizon, userId, persist = true, concurrency = 2 } = parsed.data;
+  const {
+    symbols,
+    userHorizon,
+    userId,
+    persist = true,
+    activeProviders: bodyProviders,
+    concurrency = 2,
+  } = parsed.data;
 
   const unique = Array.from(new Set(symbols.map((s) => s.trim()).filter(Boolean)));
-  const activeProviders = await getActiveProviders(userId);
-  if (Array.isArray(activeProviders) && activeProviders.length === 0) {
-    return Response.json(
-      { error: "Select at least one council model." },
-      { status: 400 },
-    );
-  }
+  const rawActiveProviders =
+    Array.isArray(bodyProviders)
+      ? bodyProviders
+      : await getActiveProviders(userId);
+  const validIds = new Set(COUNCIL_MODELS.map((m) => m.id));
+  const activeProviders = Array.isArray(rawActiveProviders)
+    ? rawActiveProviders.filter((id) => validIds.has(id))
+    : rawActiveProviders;
+  const providers =
+    Array.isArray(activeProviders) && activeProviders.length === 0
+      ? [DEFAULT_COUNCIL_PROVIDER_ID]
+      : activeProviders;
   const results = await withConcurrency(
     unique,
-    (sym) => runOne(sym, userHorizon, userId, persist, activeProviders),
+    (sym) => runOne(sym, userHorizon, userId, persist, providers),
     concurrency,
   );
 

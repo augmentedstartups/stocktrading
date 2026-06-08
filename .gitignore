@@ -12,6 +12,8 @@ __pycache__
 .DS_Store
 .turbo
 *.log
+logs/
+.run/
 services/ml/data/parquet/*
 services/ml/data/models/*
 !services/ml/data/parquet/.gitkeep

@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
 import { parseVerdictJson } from "../parse";
 import type { ProviderResult } from "./types";
@@ -24,12 +24,12 @@ export async function askOpenAICompatible(opts: {
     };
   }
   try {
-    const client = createOpenAI({ apiKey, baseURL });
+    const client = createOpenAICompatible({ apiKey, baseURL, name: provider });
     const { text } = await generateText({
-      model: client(model),
+      model: client.chatModel(model),
       system,
       prompt: user,
-      temperature: 0.2,
+      temperature: provider === "moonshot" ? 1 : 0.2,
     });
     const verdict = parseVerdictJson(text);
     return {

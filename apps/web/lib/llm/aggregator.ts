@@ -1,18 +1,6 @@
 import type { Action, Decision, Horizon } from "./schema";
 import type { ProviderResult } from "./providers/types";
 
-function voteToScore(action: Action): number {
-  if (action === "buy") return 1;
-  if (action === "sell") return -1;
-  return 0;
-}
-
-function scoreToAction(s: number): Action {
-  if (s > 0.22) return "buy";
-  if (s < -0.22) return "sell";
-  return "hold";
-}
-
 export function aggregateCouncil(opts: {
   symbol: string;
   results: ProviderResult[];
@@ -20,14 +8,20 @@ export function aggregateCouncil(opts: {
   modelWeights?: Record<string, number>;
 }): Decision {
   const { symbol, results, rl, modelWeights } = opts;
-  let num = 0;
-  let den = 0;
+  let buyScore = 0;
+  let sellScore = 0;
+  let holdScore = 0;
+  let modelBuyScore = 0;
+  let modelSellScore = 0;
+  let modelHoldScore = 0;
+  const counts: Record<Action, number> = { buy: 0, sell: 0, hold: 0 };
   const perModel: Decision["perModel"] = [];
 
   if (rl) {
     const w = 1.15 * rl.confidence;
-    num += voteToScore(rl.action) * w;
-    den += w;
+    if (rl.action === "buy") buyScore += w;
+    else if (rl.action === "sell") sellScore += w;
+    else holdScore += w;
   }
 
   for (const r of results) {
@@ -50,8 +44,18 @@ export function aggregateCouncil(opts: {
     }
     const v = r.verdict;
     const w = baseW * v.confidence;
-    num += voteToScore(v.action) * w;
-    den += w;
+    counts[v.action] += 1;
+    if (v.action === "buy") {
+      buyScore += w;
+      modelBuyScore += w;
+    } else if (v.action === "sell") {
+      sellScore += w;
+      modelSellScore += w;
+    } else {
+      holdScore += w;
+      modelHoldScore += w;
+    }
+
     perModel.push({
       provider: r.provider,
       model: r.model,
@@ -65,16 +69,45 @@ export function aggregateCouncil(opts: {
     });
   }
 
-  const raw = den > 0 ? num / den : 0;
-  const action = scoreToAction(raw);
-  const confidence = Math.min(0.97, Math.abs(raw) * 0.85 + (den > 0 ? 0.08 : 0));
+  const totalScore = buyScore + sellScore + holdScore;
+  const modelScoreTotal = modelBuyScore + modelSellScore + modelHoldScore;
+  const successfulVotes = counts.buy + counts.sell + counts.hold;
+  const modelMajority = pickModelMajority(counts);
+  let action: Action = "hold";
+  let confidence = 0.5;
+
+  if (modelMajority && successfulVotes >= 2 && modelScoreTotal > 0) {
+    action = modelMajority;
+    confidence =
+      modelMajority === "buy"
+        ? modelBuyScore / modelScoreTotal
+        : modelMajority === "sell"
+          ? modelSellScore / modelScoreTotal
+          : modelHoldScore / modelScoreTotal;
+  } else if (totalScore > 0) {
+    if (buyScore === sellScore && buyScore > holdScore) {
+      action = "hold";
+      confidence = buyScore / totalScore;
+    } else if (buyScore > sellScore && buyScore >= holdScore) {
+      action = "buy";
+      confidence = buyScore / totalScore;
+    } else if (sellScore > buyScore && sellScore >= holdScore) {
+      action = "sell";
+      confidence = sellScore / totalScore;
+    } else {
+      action = "hold";
+      confidence = holdScore / totalScore;
+    }
+  }
+
+  confidence = Math.min(0.97, Math.max(0.08, confidence));
 
   const reasons: string[] = [];
   const horizonVotes: Horizon[] = [];
   for (const r of results) {
     if (r.ok && r.verdict) {
       horizonVotes.push(r.verdict.horizon);
-      if (r.verdict.reasons[0]) reasons.push(`${r.provider}: ${r.verdict.reasons[0]}`);
+      if (r.verdict.reasons[0]) reasons.push(`${r.model}: ${r.verdict.reasons[0]}`);
     }
   }
   if (reasons.length === 0) reasons.push("Insufficient convergent model output; defaulting to conservative synthesis.");
@@ -90,6 +123,14 @@ export function aggregateCouncil(opts: {
     perModel,
     rlInput: rl,
   };
+}
+
+function pickModelMajority(counts: Record<Action, number>): Action | null {
+  const ranked = (Object.entries(counts) as Array<[Action, number]>).sort(
+    (a, b) => b[1] - a[1],
+  );
+  if (ranked[0][1] === 0 || ranked[0][1] === ranked[1][1]) return null;
+  return ranked[0][0];
 }
 
 function pickHorizon(votes: Horizon[]): Horizon {

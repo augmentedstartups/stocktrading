@@ -1,9 +1,9 @@
 import { councilSystemPrompt, councilUserPrompt } from "./prompts";
 import { askAnthropic, askAnthropicSonnet } from "./providers/anthropic";
-import { askDeepSeek } from "./providers/deepseek";
 import { askGemini, askGeminiFlashLite } from "./providers/gemini";
 import { askGLM } from "./providers/glm";
 import { askKimi } from "./providers/kimi";
+import { askLocal } from "./providers/local";
 import { askMiniMax } from "./providers/minimax";
 import type { ProviderResult } from "./providers/types";
 import type { SentimentSnapshot } from "./sentiment";
@@ -17,9 +17,15 @@ export type CouncilModel = {
 
 export const COUNCIL_MODELS: CouncilModel[] = [
   {
-    id: `anthropic/${process.env.ANTHROPIC_COUNCIL_MODEL ?? "claude-opus-4-7"}`,
+    id: `local/${process.env.LOCAL_COUNCIL_MODEL ?? "google/gemma-4-12b"}`,
+    provider: "local",
+    label: "Local Gemma 4 12B",
+    run: (s, u) => askLocal(s, u),
+  },
+  {
+    id: `anthropic/${process.env.ANTHROPIC_COUNCIL_MODEL ?? "claude-opus-4-8"}`,
     provider: "anthropic",
-    label: "Claude Opus 4.7",
+    label: "Claude Opus 4.8",
     run: (s, u) => askAnthropic(s, u),
   },
   {
@@ -35,16 +41,10 @@ export const COUNCIL_MODELS: CouncilModel[] = [
     run: (s, u) => askGemini(s, u),
   },
   {
-    id: `google/${process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-3.1-flash-lite-preview"}`,
+    id: `google/${process.env.GEMINI_FLASH_MODEL ?? process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-3.5-flash"}`,
     provider: "google",
-    label: "Gemini 3.1 Flash Lite",
+    label: "Gemini 3.5 Flash",
     run: (s, u) => askGeminiFlashLite(s, u),
-  },
-  {
-    id: `deepseek/${process.env.DEEPSEEK_MODEL ?? "deepseek-v4-pro"}`,
-    provider: "deepseek",
-    label: "DeepSeek V4 Pro",
-    run: (s, u) => askDeepSeek(s, u),
   },
   {
     id: `moonshot/${process.env.MOONSHOT_MODEL ?? "kimi-k2.6"}`,
@@ -59,12 +59,14 @@ export const COUNCIL_MODELS: CouncilModel[] = [
     run: (s, u) => askGLM(s, u),
   },
   {
-    id: `minimax/${process.env.MINIMAX_MODEL ?? "MiniMax-M2.7"}`,
+    id: `minimax/${process.env.MINIMAX_MODEL ?? "MiniMax-M3"}`,
     provider: "minimax",
-    label: "MiniMax M2.7",
+    label: "MiniMax M3",
     run: (s, u) => askMiniMax(s, u),
   },
 ];
+
+export const DEFAULT_COUNCIL_PROVIDER_ID = COUNCIL_MODELS[0].id;
 
 export function listCouncilModels(): Array<{
   id: string;

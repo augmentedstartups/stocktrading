@@ -13,27 +13,35 @@ export function ThemeToggle() {
     setMounted(true);
   }, []);
 
+  if (!mounted) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label="Toggle theme"
+        suppressHydrationWarning
+      >
+        <Moon size={20} weight="regular" />
+      </Button>
+    );
+  }
+
   const dark = theme === "dark";
-  const label = mounted
-    ? dark
-      ? "Switch to light mode"
-      : "Switch to dark mode"
-    : "Toggle theme";
-  const icon = mounted && dark ? (
-    <Sun size={20} weight="regular" />
-  ) : (
-    <Moon size={20} weight="regular" />
-  );
 
   return (
     <Button
       type="button"
       variant="outline"
       size="icon"
-      aria-label={label}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
       onClick={() => setTheme(dark ? "light" : "dark")}
     >
-      {icon}
+      {dark ? (
+        <Sun size={20} weight="regular" />
+      ) : (
+        <Moon size={20} weight="regular" />
+      )}
     </Button>
   );
 }

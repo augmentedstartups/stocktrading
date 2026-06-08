@@ -1,5 +1,5 @@
 import { aggregateCouncil } from "@/lib/llm/aggregator";
-import { COUNCIL_MODELS, runCouncil } from "@/lib/llm/council";
+import { COUNCIL_MODELS, DEFAULT_COUNCIL_PROVIDER_ID, runCouncil } from "@/lib/llm/council";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
 import { getActiveProviders, insertDecision } from "@/lib/convexServer";
@@ -82,12 +82,10 @@ export async function POST(req: Request) {
   const activeProviders = Array.isArray(rawActiveProviders)
     ? rawActiveProviders.filter((id) => validIds.has(id))
     : rawActiveProviders;
-  if (Array.isArray(activeProviders) && activeProviders.length === 0) {
-    return Response.json(
-      { error: "Select at least one council model." },
-      { status: 400 },
-    );
-  }
+  const providers =
+    Array.isArray(activeProviders) && activeProviders.length === 0
+      ? [DEFAULT_COUNCIL_PROVIDER_ID]
+      : activeProviders;
 
   const results = await runCouncil({
     symbol,
@@ -96,7 +94,7 @@ export async function POST(req: Request) {
     sentiment,
     rl,
     userHorizon,
-    activeProviders,
+    activeProviders: providers,
   });
 
   const decision = aggregateCouncil({ symbol, results, rl });

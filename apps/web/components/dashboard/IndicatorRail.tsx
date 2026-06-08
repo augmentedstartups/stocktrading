@@ -18,7 +18,7 @@ import {
   WaveTriangle,
 } from "@phosphor-icons/react";
 import { useReducedMotion } from "framer-motion";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +71,9 @@ export function IndicatorRail({
   disableToggle?: boolean;
   onToggleComplete: (next: string[]) => void | Promise<void>;
 }) {
-  const active = useMemo(() => new Set(indicators), [indicators]);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const active = useMemo(() => new Set(mounted ? indicators : []), [indicators, mounted]);
 
   const toggle = async (id: string) => {
     if (disableToggle) return;

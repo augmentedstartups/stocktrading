@@ -4,7 +4,7 @@ import { askOpenAICompatible } from "./openaiCompatible";
 export async function askMiniMax(
   system: string,
   user: string,
-  model = process.env.MINIMAX_MODEL ?? "MiniMax-M2.7",
+  model = process.env.MINIMAX_MODEL ?? "MiniMax-M3",
 ): Promise<ProviderResult> {
   const baseURL =
     process.env.MINIMAX_BASE_URL ?? "https://api.minimax.io/v1";

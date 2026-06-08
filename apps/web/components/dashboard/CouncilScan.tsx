@@ -1,14 +1,27 @@
 "use client";
 
-import { CaretDown, CircleNotch, MagnifyingGlass, Play, Plus, Trash } from "@phosphor-icons/react";
+import {
+  ArrowSquareOut,
+  CaretDown,
+  CircleNotch,
+  MagnifyingGlass,
+  Play,
+  Plus,
+  Trash,
+} from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
+import { CouncilModelPicker } from "./CouncilModelPicker";
+import { ReasonsList } from "./ReasonsList";
 import { cn } from "@/lib/utils";
+import { LOCAL_GEMMA_PROVIDER_ID } from "@/lib/llm/activeProviders";
 import type { Action } from "@/lib/llm/schema";
+
+const DEFAULT_LOCAL_PROVIDER_ID = LOCAL_GEMMA_PROVIDER_ID;
 
 type WatchRow = { _id: Id<"watchlist">; symbol: string; favorite: boolean };
 type TickerRow = { symbol: string; name: string; market?: string; sector?: string };
@@ -66,7 +79,13 @@ function confidenceBadge(action: Action | undefined, confidence: number | undefi
   return "bg-zinc-100 text-zinc-500 dark:bg-zinc-800/60 dark:text-zinc-400";
 }
 
-export function CouncilScan() {
+export function CouncilScan({
+  title = "Council scan",
+  description = "Run the local analysis model across every watchlist ticker and view buy / hold / sell verdicts in one place.",
+}: {
+  title?: string;
+  description?: string;
+}) {
   const u = useQuery(api.users.first);
   const uid = u?._id ?? null;
   const settings = useQuery(
@@ -82,7 +101,24 @@ export function CouncilScan() {
     uid ? { userId: uid as Id<"users"> } : "skip",
   );
   const tickers = useQuery(api.tickers.list);
-  const activeProviders = (settings?.activeProviders ?? []) as string[];
+  const setProvidersMut = useMutation(api.settings.setActiveProviders);
+  const [activeProviders, setActiveProviders] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (settings?.activeProviders?.length) {
+      setActiveProviders(settings.activeProviders as string[]);
+    } else {
+      setActiveProviders([DEFAULT_LOCAL_PROVIDER_ID]);
+    }
+  }, [settings?.activeProviders]);
+
+  const setActiveProvidersAndSave = (next: string[]) => {
+    setActiveProviders(next);
+    if (uid) void setProvidersMut({ userId: uid, activeProviders: next });
+  };
+
+  const providersForRun =
+    activeProviders.length > 0 ? activeProviders : [DEFAULT_LOCAL_PROVIDER_ID];
   const addToWatch = useMutation(api.watchlist.add);
   const removeFromWatch = useMutation(api.watchlist.remove);
 
@@ -157,6 +193,7 @@ export function CouncilScan() {
           symbols: watchlist.map((w) => w.symbol),
           persist: true,
           userId: uid ?? undefined,
+          activeProviders: providersForRun,
         }),
       });
       if (!r.ok) {
@@ -205,6 +242,7 @@ export function CouncilScan() {
           symbol: sym,
           persist: true,
           userId: uid ?? undefined,
+          activeProviders: providersForRun,
         }),
       });
     } catch (e) {
@@ -225,25 +263,26 @@ export function CouncilScan() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl tracking-tight text-ink md:text-4xl">
-            Council scan
+            {title}
           </h1>
           <p className="mt-1 text-sm text-steel">
-            Run the multi-model council across every watchlist ticker and view
-            buy / hold / sell verdicts in one place.
+            {description}
           </p>
         </div>
-        <Button
-          type="button"
-          onClick={() => void runScan()}
-          disabled={scanning || watchlist.length === 0 || activeProviders.length === 0}
-        >
-          {scanning ? "Scanning council…" : `Run council on ${watchlist.length} tickers`}
-        </Button>
-        {activeProviders.length === 0 && (
-          <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-            Select models in Settings to enable the council.
-          </p>
-        )}
+        <div className="flex flex-wrap items-end gap-3">
+          <CouncilModelPicker
+            selected={activeProviders}
+            onChange={setActiveProvidersAndSave}
+            defaultIds={settings?.activeProviders ?? [DEFAULT_LOCAL_PROVIDER_ID]}
+          />
+          <Button
+            type="button"
+            onClick={() => void runScan()}
+            disabled={scanning || watchlist.length === 0 || providersForRun.length === 0}
+          >
+            {scanning ? "Scanning watchlist…" : `Analyze all ${watchlist.length} tickers`}
+          </Button>
+        </div>
       </header>
 
       {scanError ? (
@@ -344,7 +383,7 @@ export function CouncilScan() {
                     decision={d ?? null}
                     isOpen={isOpen}
                     running={runningSymbols.has(w.symbol)}
-                    runDisabled={activeProviders.length === 0}
+                    runDisabled={providersForRun.length === 0}
                     onToggle={() => toggleExpand(w.symbol)}
                     onRemove={() => void removeSymbol(w.symbol)}
                     onRun={() => void runSingle(w.symbol)}
@@ -391,12 +430,13 @@ function FragmentRow({
 }) {
   const confPct = decision ? Math.round(decision.confidence * 100) : null;
   const badgeClasses = confidenceBadge(decision?.action, decision?.confidence);
+  const tickerHref = `/ticker/${encodeURIComponent(symbol)}`;
   return (
     <>
       <tr
         className={cn("transition-colors hover:bg-muted/40", isOpen && "bg-muted/30")}
       >
-        <td className="py-3 pl-4">
+        <td className="w-12 py-3 pl-4 pr-3">
           <button
             type="button"
             onClick={onToggle}
@@ -409,8 +449,22 @@ function FragmentRow({
             />
           </button>
         </td>
-        <td className="py-3 font-mono text-sm">{symbol}</td>
-        <td className="py-3 text-sm text-zinc-600 dark:text-zinc-400">{name}</td>
+        <td className="py-3 pl-2">
+          <Link
+            href={tickerHref}
+            className="font-mono text-sm text-ink transition-colors hover:text-emerald-600 dark:hover:text-emerald-400"
+          >
+            {symbol}
+          </Link>
+        </td>
+        <td className="py-3">
+          <Link
+            href={tickerHref}
+            className="text-sm text-zinc-600 transition-colors hover:text-emerald-600 dark:text-zinc-400 dark:hover:text-emerald-400"
+          >
+            {name}
+          </Link>
+        </td>
         <td className="py-3">
           <span
             className={cn(
@@ -457,7 +511,9 @@ function FragmentRow({
               )}
             </Button>
             <Button asChild type="button" variant="ghost" size="sm">
-              <Link href={`/ticker/${encodeURIComponent(symbol)}`}>Open</Link>
+              <Link href={tickerHref} aria-label={`Open ${symbol}`} title={`Open ${symbol}`}>
+                <ArrowSquareOut size={16} />
+              </Link>
             </Button>
             <Button
               type="button"
@@ -496,13 +552,7 @@ function DeepDive({ decision, symbol }: { decision: DecisionDoc | null; symbol: 
         <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-steel">
           Reasons
         </p>
-        <ul className="space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
-          {decision.reasons.map((r, i) => (
-            <li key={i} className="leading-relaxed">
-              · {r}
-            </li>
-          ))}
-        </ul>
+        <ReasonsList perModel={decision.perModel} reasons={decision.reasons} />
       </div>
       <div>
         <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-steel">

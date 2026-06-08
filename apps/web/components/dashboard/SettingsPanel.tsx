@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
+import { migrateActiveProviders } from "@/lib/llm/activeProviders";
 
 type CouncilModelMeta = { id: string; provider: string; label: string };
 
@@ -47,11 +48,10 @@ function SettingsInner() {
 
   useEffect(() => {
     if (!uid || !settings || models.length === 0) return;
-    const valid = new Set(models.map((m) => m.id));
     const stored = settings.activeProviders ?? [];
-    const pruned = stored.filter((id) => valid.has(id));
-    if (pruned.length !== stored.length) {
-      void update({ userId: uid, activeProviders: pruned });
+    const next = migrateActiveProviders(stored, models.map((m) => m.id));
+    if (next.length !== stored.length || next.some((id, i) => id !== stored[i])) {
+      void update({ userId: uid, activeProviders: next });
     }
   }, [uid, settings, models, update]);
 
@@ -62,14 +62,14 @@ function SettingsInner() {
       { name: "Gemini", key: "server-side env" },
       {
         name: "ML service",
-        key: process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:8000",
+        key: process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:58123",
       },
     ],
     [],
   );
 
   const pingMl = async () => {
-    const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:8000";
+    const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:58123";
     try {
       const r = await fetch(`${base}/health`);
       const j = await r.json();

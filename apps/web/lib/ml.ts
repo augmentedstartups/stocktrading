@@ -1,7 +1,7 @@
 const base = () =>
   process.env.ML_INTERNAL_URL ??
   process.env.NEXT_PUBLIC_ML_URL ??
-  "http://localhost:8000";
+  "http://localhost:58123";
 
 export async function mlGet<T>(path: string): Promise<T> {
   const r = await fetch(`${base()}${path}`, { cache: "no-store" });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import type { Action } from "@/lib/llm/schema";
@@ -66,7 +66,20 @@ export function DecisionCard({
   inputsUsed?: InputsUsed;
 }) {
   const reduce = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  useEffect(() => setMounted(true), []);
+
+  const formatModelTime = (timestamp: string) => {
+    if (!mounted) return "";
+    return new Date(timestamp).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
   const ring = Math.round(confidence * 100);
   const color =
     action === "buy"
@@ -88,6 +101,24 @@ export function DecisionCard({
             ok: true,
           };
         });
+  const successfulRows = rows.filter((r) => r.ok);
+  const failedRows = rows.length - successfulRows.length;
+  const agreementCount = successfulRows.filter((r) => r.action === action).length;
+  const rlHint = inputsUsed?.evidence?.rl;
+  const rlAction =
+    rlHint && ["buy", "hold", "sell"].includes(rlHint.action)
+      ? (rlHint.action as Action)
+      : null;
+  const rlConfidence =
+    typeof rlHint?.confidence === "number" ? Math.round(rlHint.confidence * 100) : null;
+  const agreementTone =
+    successfulRows.length === 0
+      ? "No successful model votes"
+      : agreementCount === successfulRows.length
+        ? "Strong agreement"
+        : agreementCount > successfulRows.length / 2
+          ? "Majority agreement"
+          : "Mixed signal";
 
   return (
     <motion.div
@@ -141,6 +172,35 @@ export function DecisionCard({
           </div>
         </div>
       </div>
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <SignalStat
+          label="Model agreement"
+          value={
+            successfulRows.length
+              ? `${agreementCount}/${successfulRows.length} ${action.toUpperCase()}`
+              : "No votes"
+          }
+          detail={
+            failedRows > 0
+              ? `${agreementTone}; ${failedRows} failed and excluded`
+              : agreementTone
+          }
+        />
+        <SignalStat
+          label="Signal strength"
+          value={`${ring}%`}
+          detail="Consensus weight, not a certainty score"
+        />
+        <SignalStat
+          label="ML policy hint"
+          value={rlAction ? `${rlAction.toUpperCase()} ${rlConfidence ?? 0}%` : "Not used"}
+          detail="Secondary input; model majority is prioritized"
+        />
+      </div>
+      <div className="mt-4 rounded-2xl border border-zinc-200/70 bg-zinc-50/70 px-4 py-3 text-xs leading-relaxed text-zinc-600 dark:border-zinc-800/70 dark:bg-zinc-950/40 dark:text-zinc-400">
+        Use this as a decision-support signal, not a trade instruction. Confirm with
+        your own risk limits, position sizing, and fresh market context before acting.
+      </div>
       <div className="mt-8 flex flex-col gap-5 border-t border-zinc-200/60 pt-6 dark:border-zinc-800/80">
         <div className="flex flex-col gap-2">
           <p className="font-mono text-[11px] uppercase tracking-widest text-steel">
@@ -188,15 +248,9 @@ export function DecisionCard({
                         {r.latencyMs}ms
                       </span>
                     ) : null}
-                    {r.timestamp ? (
-                      <span className="number text-[11px] text-steel/60">
-                        • {new Date(r.timestamp).toLocaleString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                          second: "2-digit",
-                        })}
+                    {r.timestamp && mounted ? (
+                      <span className="number text-[11px] text-steel/60" suppressHydrationWarning>
+                        • {formatModelTime(r.timestamp)}
                       </span>
                     ) : null}
                   </div>
@@ -267,6 +321,28 @@ export function DecisionCard({
         </ul>
       </div>
     </motion.div>
+  );
+}
+
+function SignalStat({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-zinc-200/70 bg-zinc-50/70 p-4 dark:border-zinc-800/70 dark:bg-zinc-950/40">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-steel">
+        {label}
+      </p>
+      <p className="mt-1 font-display text-xl tracking-tight text-ink">{value}</p>
+      <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+        {detail}
+      </p>
+    </div>
   );
 }
 
