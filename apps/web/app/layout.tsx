@@ -15,6 +15,24 @@ export const metadata: Metadata = {
   title: "Council — Stock Decisions",
   description:
     "Multi-LLM council, technical analysis, sentiment, and reinforcement learning fused into a single Buy/Hold/Sell signal.",
+  applicationName: "Council",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+  },
+  openGraph: {
+    title: "Council — Stock Decisions",
+    description:
+      "Multi-LLM council, technical analysis, sentiment, and reinforcement learning fused into a single Buy/Hold/Sell signal.",
+    siteName: "Council",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Council — Stock Decisions",
+    description:
+      "Multi-LLM council, technical analysis, sentiment, and reinforcement learning fused into a single Buy/Hold/Sell signal.",
+  },
 };
 
 export const viewport: Viewport = {
