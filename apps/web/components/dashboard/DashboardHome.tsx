@@ -13,12 +13,13 @@ import { CouncilModelPicker } from "./CouncilModelPicker";
 import { DecisionCard } from "./DecisionCard";
 import { IndicatorRail } from "./IndicatorRail";
 import { NewsList } from "./NewsList";
+import { FundamentalAnalysis } from "./FundamentalAnalysis";
 import { SentimentMeter } from "./SentimentMeter";
 import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
 import { TickerCombobox } from "./TickerCombobox";
 import { WatchlistTable } from "./WatchlistTable";
 import type { Action } from "@/lib/llm/schema";
-import { applySentimentWire, fetchSentimentWire } from "@/lib/ml";
+import { applySentimentWire, fetchFundamentals, fetchSentimentWire, getCachedFundamentals, type FundamentalsResponse } from "@/lib/ml";
 
 type PerModelRow = {
   provider: string;
@@ -197,6 +198,9 @@ function OfflineDashboard() {
   } | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [newsRefreshing, setNewsRefreshing] = useState(false);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [fundamentals, setFundamentals] = useState<FundamentalsResponse | null>(null);
+  const [fundamentalsLoading, setFundamentalsLoading] = useState(true);
   const [railIndicators, setRailIndicators] = useState<string[]>([
     "MA50",
     "MA200",
@@ -208,6 +212,28 @@ function OfflineDashboard() {
   useEffect(() => {
     setDecision(null);
     setInputsUsed(null);
+    const cached = getCachedFundamentals(symbol);
+    setFundamentals(cached);
+    setFundamentalsLoading(!cached);
+  }, [symbol]);
+
+  const loadFundamentals = useCallback(async (refresh = false) => {
+    if (!refresh) {
+      const cached = getCachedFundamentals(symbol);
+      if (cached) {
+        setFundamentals(cached);
+        setFundamentalsLoading(false);
+        return;
+      }
+    }
+    setFundamentalsLoading(true);
+    try {
+      setFundamentals(await fetchFundamentals(symbol, refresh));
+    } catch {
+      setFundamentals(getCachedFundamentals(symbol));
+    } finally {
+      setFundamentalsLoading(false);
+    }
   }, [symbol]);
 
   const loadChart = useCallback(async () => {
@@ -221,32 +247,31 @@ function OfflineDashboard() {
       const ir = await fetch(`${base}/indicators?symbol=${encodedSymbol}`);
       const ij = await ir.json();
       setSeries(ij.series ?? []);
-      const { articles, sentiment: wireSentiment } = applySentimentWire(
-        await fetchSentimentWire(symbol),
-      );
-      setNews(articles);
-      setSentiment(wireSentiment);
     } catch {
       setChartError("Market data service is unavailable.");
     }
   }, [symbol]);
 
-  const loadNewsWire = useCallback(async () => {
+  const loadNewsWire = useCallback(async (refresh = false) => {
+    setNewsLoading(true);
     setNewsRefreshing(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
-        await fetchSentimentWire(symbol),
+        await fetchSentimentWire(symbol, refresh),
       );
       setNews(articles);
       setSentiment(wireSentiment);
     } finally {
+      setNewsLoading(false);
       setNewsRefreshing(false);
     }
   }, [symbol]);
 
   useEffect(() => {
     void loadChart();
-  }, [loadChart]);
+    void loadNewsWire(false);
+    void loadFundamentals(false);
+  }, [loadChart, loadFundamentals, loadNewsWire]);
 
   const runCouncil = async () => {
     setLoading(true);
@@ -305,7 +330,14 @@ function OfflineDashboard() {
             selected={activeProviders}
             onChange={setActiveProviders}
           />
-          <Button type="button" onClick={() => void loadChart()}>
+          <Button
+            type="button"
+            onClick={() => {
+              void loadChart();
+              void loadNewsWire(true);
+              void loadFundamentals(true);
+            }}
+          >
             Refresh data
           </Button>
           <Button type="button" variant="secondary" onClick={() => void runCouncil()} disabled={loading || activeProviders.length === 0}>
@@ -360,8 +392,14 @@ function OfflineDashboard() {
         ) : null}
         <NewsList
           items={news}
-          onRefresh={() => void loadNewsWire()}
+          onRefresh={() => void loadNewsWire(true)}
+          loading={newsLoading}
           refreshing={newsRefreshing}
+        />
+        <FundamentalAnalysis
+          data={fundamentals}
+          loading={fundamentalsLoading}
+          onRefresh={() => void loadFundamentals(true)}
         />
       </aside>
     </div>
@@ -402,6 +440,9 @@ function LiveDashboard() {
   useEffect(() => {
     setLocalDecision(null);
     setLocalInputsUsed(null);
+    const cached = getCachedFundamentals(symbol);
+    setFundamentals(cached);
+    setFundamentalsLoading(!cached);
   }, [symbol]);
 
   useEffect(() => {
@@ -422,6 +463,9 @@ function LiveDashboard() {
   } | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [newsRefreshing, setNewsRefreshing] = useState(false);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [fundamentals, setFundamentals] = useState<FundamentalsResponse | null>(null);
+  const [fundamentalsLoading, setFundamentalsLoading] = useState(true);
 
   const indicators = (settings?.indicators ?? []) as string[];
   const active = useMemo(() => new Set<string>(indicators), [indicators]);
@@ -429,6 +473,25 @@ function LiveDashboard() {
     tickers && tickers.length
       ? tickers.map((t) => ({ symbol: t.symbol, name: t.name }))
       : OFFLINE_TICKERS;
+
+  const loadFundamentals = useCallback(async (refresh = false) => {
+    if (!refresh) {
+      const cached = getCachedFundamentals(symbol);
+      if (cached) {
+        setFundamentals(cached);
+        setFundamentalsLoading(false);
+        return;
+      }
+    }
+    setFundamentalsLoading(true);
+    try {
+      setFundamentals(await fetchFundamentals(symbol, refresh));
+    } catch {
+      setFundamentals(getCachedFundamentals(symbol));
+    } finally {
+      setFundamentalsLoading(false);
+    }
+  }, [symbol]);
 
   const loadChart = useCallback(async () => {
     try {
@@ -441,32 +504,31 @@ function LiveDashboard() {
       const ir = await fetch(`${base}/indicators?symbol=${encodedSymbol}&period=${period}`);
       const ij = await ir.json();
       setSeries(ij.series ?? []);
-      const { articles, sentiment: wireSentiment } = applySentimentWire(
-        await fetchSentimentWire(symbol),
-      );
-      setNews(articles);
-      setSentiment(wireSentiment);
     } catch {
       setChartError("Market data service is unavailable.");
     }
   }, [period, symbol]);
 
-  const loadNewsWire = useCallback(async () => {
+  const loadNewsWire = useCallback(async (refresh = false) => {
+    setNewsLoading(true);
     setNewsRefreshing(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
-        await fetchSentimentWire(symbol),
+        await fetchSentimentWire(symbol, refresh),
       );
       setNews(articles);
       setSentiment(wireSentiment);
     } finally {
+      setNewsLoading(false);
       setNewsRefreshing(false);
     }
   }, [symbol]);
 
   useEffect(() => {
     void loadChart();
-  }, [loadChart]);
+    void loadNewsWire(false);
+    void loadFundamentals(false);
+  }, [loadChart, loadFundamentals, loadNewsWire]);
 
   useEffect(() => {
     if (wl && wl.length && !defaultedRef.current) {
@@ -575,7 +637,14 @@ function LiveDashboard() {
                 onChange={setActiveProvidersAndSave}
                 defaultIds={settings?.activeProviders ?? []}
               />
-              <Button type="button" onClick={() => void loadChart()}>
+              <Button
+                type="button"
+                onClick={() => {
+                  void loadChart();
+                  void loadNewsWire(true);
+                  void loadFundamentals(true);
+                }}
+              >
                 Refresh data
               </Button>
               <Button type="button" variant="secondary" onClick={() => void runCouncil()} disabled={loading || activeProviders.length === 0}>
@@ -642,8 +711,14 @@ function LiveDashboard() {
           ) : null}
           <NewsList
             items={news}
-            onRefresh={() => void loadNewsWire()}
+            onRefresh={() => void loadNewsWire(true)}
+            loading={newsLoading}
             refreshing={newsRefreshing}
+          />
+          <FundamentalAnalysis
+            data={fundamentals}
+            loading={fundamentalsLoading}
+            onRefresh={() => void loadFundamentals(true)}
           />
         </aside>
       </div>

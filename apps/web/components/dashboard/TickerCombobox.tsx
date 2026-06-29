@@ -20,18 +20,19 @@ export function TickerCombobox({
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
+  const [remoteOptions, setRemoteOptions] = useState<TickerOption[]>([]);
   const normalizedValue = value.toUpperCase();
   const normalizedQuery = query.trim().toUpperCase();
   const unique = useMemo(() => {
     const seen = new Set<string>();
-    return options
+    return [...options, ...remoteOptions]
       .map((o) => ({ ...o, symbol: o.symbol.toUpperCase() }))
       .filter((o) => {
         if (seen.has(o.symbol)) return false;
         seen.add(o.symbol);
         return true;
       });
-  }, [options]);
+  }, [options, remoteOptions]);
   const visible = useMemo(() => {
     if (!normalizedQuery) return unique;
     return unique.filter(
@@ -48,6 +49,32 @@ export function TickerCombobox({
   useEffect(() => {
     if (!open) setQuery(value);
   }, [open, value]);
+
+  useEffect(() => {
+    if (!open || normalizedQuery.length < 1) {
+      setRemoteOptions([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      void fetch(`/api/tickers/search?q=${encodeURIComponent(normalizedQuery)}`, {
+        signal: controller.signal,
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: { results?: TickerOption[] } | null) => {
+          setRemoteOptions(data?.results ?? []);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setRemoteOptions([]);
+        });
+    }, 200);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [open, normalizedQuery]);
 
   const commit = (next: string) => {
     const symbol = next.trim().toUpperCase();

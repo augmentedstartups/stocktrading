@@ -14,12 +14,13 @@ import { HorizonPicker } from "./HorizonPicker";
 import { DecisionCard } from "./DecisionCard";
 import { IndicatorRail } from "./IndicatorRail";
 import { NewsList } from "./NewsList";
+import { FundamentalAnalysis } from "./FundamentalAnalysis";
 import { SentimentMeter } from "./SentimentMeter";
 import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
 import { TickerCombobox } from "./TickerCombobox";
 import { WatchlistTable } from "./WatchlistTable";
 import type { Action, Horizon } from "@/lib/llm/schema";
-import { applySentimentWire, fetchSentimentWire } from "@/lib/ml";
+import { applySentimentWire, fetchFundamentals, fetchSentimentWire, getCachedFundamentals, type FundamentalsResponse } from "@/lib/ml";
 
 const DEFAULT_LOCAL_PROVIDER_ID = "local/google/gemma-4-12b";
 
@@ -169,7 +170,35 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
     llmBlended?: boolean;
   } | null>(null);
   const [newsRefreshing, setNewsRefreshing] = useState(false);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [fundamentals, setFundamentals] = useState<FundamentalsResponse | null>(null);
+  const [fundamentalsLoading, setFundamentalsLoading] = useState(true);
   const active = useMemo(() => new Set(["MA50", "MA200", "Volume", "RSI"]), []);
+
+  useEffect(() => {
+    const cached = getCachedFundamentals(symbol);
+    setFundamentals(cached);
+    setFundamentalsLoading(!cached);
+  }, [symbol]);
+
+  const loadFundamentals = useCallback(async (refresh = false) => {
+    if (!refresh) {
+      const cached = getCachedFundamentals(symbol);
+      if (cached) {
+        setFundamentals(cached);
+        setFundamentalsLoading(false);
+        return;
+      }
+    }
+    setFundamentalsLoading(true);
+    try {
+      setFundamentals(await fetchFundamentals(symbol, refresh));
+    } catch {
+      setFundamentals(getCachedFundamentals(symbol));
+    } finally {
+      setFundamentalsLoading(false);
+    }
+  }, [symbol]);
 
   const loadChart = useCallback(async () => {
     const base = process.env.NEXT_PUBLIC_ML_URL ?? "http://localhost:58123";
@@ -180,29 +209,28 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
     const ir = await fetch(`${base}/indicators?symbol=${encoded}&period=${period}`);
     const ij = await ir.json();
     setSeries(ij.series ?? []);
-    const { articles, sentiment: wireSentiment } = applySentimentWire(
-      await fetchSentimentWire(symbol),
-    );
-    setNews(articles);
-    setSentiment(wireSentiment);
   }, [period, symbol]);
 
-  const loadNewsWire = useCallback(async () => {
+  const loadNewsWire = useCallback(async (refresh = false) => {
+    setNewsLoading(true);
     setNewsRefreshing(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
-        await fetchSentimentWire(symbol),
+        await fetchSentimentWire(symbol, refresh),
       );
       setNews(articles);
       setSentiment(wireSentiment);
     } finally {
+      setNewsLoading(false);
       setNewsRefreshing(false);
     }
   }, [symbol]);
 
   useEffect(() => {
     void loadChart();
-  }, [loadChart]);
+    void loadNewsWire(false);
+    void loadFundamentals(false);
+  }, [loadChart, loadFundamentals, loadNewsWire]);
 
   const runCouncil = async () => {
     setLoading(true);
@@ -232,7 +260,11 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
       tickerOptions={OFFLINE_TICKERS}
       watchlistCount={0}
       onOpenWatchlist={() => {}}
-      onRefresh={() => void loadChart()}
+      onRefresh={() => {
+        void loadChart();
+        void loadNewsWire(true);
+        void loadFundamentals(true);
+      }}
       onRunCouncil={() => void runCouncil()}
       onDeepSentiment={async () => {
         const r = await fetch("/api/sentiment/deep", {
@@ -264,8 +296,12 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
       inputsUsed={null}
       sentiment={sentiment}
       news={news}
-      onRefreshNews={() => void loadNewsWire()}
+      onRefreshNews={() => void loadNewsWire(true)}
+      newsLoading={newsLoading}
       newsRefreshing={newsRefreshing}
+      fundamentals={fundamentals}
+      fundamentalsLoading={fundamentalsLoading}
+      onRefreshFundamentals={() => void loadFundamentals(true)}
       watchlistSheet={null}
     />
   );
@@ -308,10 +344,35 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
   } | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [newsRefreshing, setNewsRefreshing] = useState(false);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [fundamentals, setFundamentals] = useState<FundamentalsResponse | null>(null);
+  const [fundamentalsLoading, setFundamentalsLoading] = useState(true);
 
   useEffect(() => {
     setLocalDecision(null);
     setLocalInputsUsed(null);
+    const cached = getCachedFundamentals(symbol);
+    setFundamentals(cached);
+    setFundamentalsLoading(!cached);
+  }, [symbol]);
+
+  const loadFundamentals = useCallback(async (refresh = false) => {
+    if (!refresh) {
+      const cached = getCachedFundamentals(symbol);
+      if (cached) {
+        setFundamentals(cached);
+        setFundamentalsLoading(false);
+        return;
+      }
+    }
+    setFundamentalsLoading(true);
+    try {
+      setFundamentals(await fetchFundamentals(symbol, refresh));
+    } catch {
+      setFundamentals(getCachedFundamentals(symbol));
+    } finally {
+      setFundamentalsLoading(false);
+    }
   }, [symbol]);
 
   useEffect(() => {
@@ -343,32 +404,31 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
       const ir = await fetch(`${base}/indicators?symbol=${encoded}&period=${period}`);
       const ij = await ir.json();
       setSeries(ij.series ?? []);
-      const { articles, sentiment: wireSentiment } = applySentimentWire(
-        await fetchSentimentWire(symbol),
-      );
-      setNews(articles);
-      setSentiment(wireSentiment);
     } catch {
       setChartError("Market data service is unavailable.");
     }
   }, [period, symbol]);
 
-  const loadNewsWire = useCallback(async () => {
+  const loadNewsWire = useCallback(async (refresh = false) => {
+    setNewsLoading(true);
     setNewsRefreshing(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
-        await fetchSentimentWire(symbol),
+        await fetchSentimentWire(symbol, refresh),
       );
       setNews(articles);
       setSentiment(wireSentiment);
     } finally {
+      setNewsLoading(false);
       setNewsRefreshing(false);
     }
   }, [symbol]);
 
   useEffect(() => {
     void loadChart();
-  }, [loadChart]);
+    void loadNewsWire(false);
+    void loadFundamentals(false);
+  }, [loadChart, loadFundamentals, loadNewsWire]);
 
   const remoteDecision = (decisions?.[symbol] ?? null) as DecisionShape | null;
   const decision = localDecision ?? remoteDecision;
@@ -470,7 +530,11 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
       ]}
       watchlistCount={wl?.length ?? 0}
       onOpenWatchlist={() => setWatchlistOpen(true)}
-      onRefresh={() => void loadChart()}
+      onRefresh={() => {
+        void loadChart();
+        void loadNewsWire(true);
+        void loadFundamentals(true);
+      }}
       onRunCouncil={() => void runCouncil()}
       onDeepSentiment={() => void deepSentiment()}
       loading={loading}
@@ -486,8 +550,12 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
       inputsUsed={decisionInputsUsed}
       sentiment={sentiment}
       news={news}
-      onRefreshNews={() => void loadNewsWire()}
+      onRefreshNews={() => void loadNewsWire(true)}
+      newsLoading={newsLoading}
       newsRefreshing={newsRefreshing}
+      fundamentals={fundamentals}
+      fundamentalsLoading={fundamentalsLoading}
+      onRefreshFundamentals={() => void loadFundamentals(true)}
       watchlistSheet={watchlistSheet}
     />
   );
@@ -522,7 +590,11 @@ function TickerDetailLayout({
   sentiment,
   news,
   onRefreshNews,
+  newsLoading = false,
   newsRefreshing = false,
+  fundamentals,
+  fundamentalsLoading = false,
+  onRefreshFundamentals,
   watchlistSheet,
 }: {
   symbol: string;
@@ -557,7 +629,11 @@ function TickerDetailLayout({
   } | null;
   news: Array<{ title: string; url: string; source: string; finbertScore: number }>;
   onRefreshNews?: () => void;
+  newsLoading?: boolean;
   newsRefreshing?: boolean;
+  fundamentals?: FundamentalsResponse | null;
+  fundamentalsLoading?: boolean;
+  onRefreshFundamentals?: () => void;
   watchlistSheet: ReactNode;
 }) {
   return (
@@ -658,7 +734,13 @@ function TickerDetailLayout({
           <NewsList
             items={news}
             onRefresh={onRefreshNews}
+            loading={newsLoading}
             refreshing={newsRefreshing}
+          />
+          <FundamentalAnalysis
+            data={fundamentals ?? null}
+            loading={fundamentalsLoading}
+            onRefresh={onRefreshFundamentals}
           />
         </aside>
       </div>

@@ -3,6 +3,7 @@
 import { ArrowClockwise } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { PanelSkeleton } from "./PanelSkeleton";
 
 export type NewsWireItem = {
   title: string;
@@ -24,12 +25,16 @@ function formatNewsDate(ts: number): string {
 export function NewsList({
   items,
   onRefresh,
+  loading = false,
   refreshing = false,
 }: {
   items: NewsWireItem[];
   onRefresh?: () => void;
+  loading?: boolean;
   refreshing?: boolean;
 }) {
+  const busy = loading || refreshing;
+
   return (
     <div className="rounded-bento border border-zinc-200/70 bg-surface shadow-diffuse dark:border-zinc-800/80">
       <div className="flex items-center gap-2 border-b border-zinc-200/60 px-6 py-4 dark:border-zinc-800/80">
@@ -38,19 +43,22 @@ export function NewsList({
           <button
             type="button"
             onClick={onRefresh}
-            disabled={refreshing}
+            disabled={busy}
             aria-label="Refresh news wire"
             title="Refresh news wire"
             className={cn(
               "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200/70 text-zinc-500 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-700/80 dark:text-zinc-400 dark:hover:text-emerald-400",
-              refreshing && "pointer-events-none",
+              busy && "pointer-events-none",
             )}
           >
-            <ArrowClockwise size={18} className={cn(refreshing && "animate-spin")} />
+            <ArrowClockwise size={18} className={cn(busy && "animate-spin")} />
           </button>
         ) : null}
       </div>
-      <ul className="divide-y divide-zinc-200/60 dark:divide-zinc-800/80">
+      {busy ? (
+        <PanelSkeleton rows={5} message="Fetching headlines & FinBERT scores…" />
+      ) : (
+        <ul className="divide-y divide-zinc-200/60 dark:divide-zinc-800/80">
         {items.slice(0, 8).map((n, i) => (
           <motion.li
             key={n.url}
@@ -90,7 +98,8 @@ export function NewsList({
         {items.length === 0 ? (
           <li className="px-6 py-8 text-sm text-steel">No headlines loaded yet.</li>
         ) : null}
-      </ul>
+        </ul>
+      )}
     </div>
   );
 }

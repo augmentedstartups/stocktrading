@@ -17,6 +17,7 @@ from api.routes import backtest, fundamentals, indicators, prices, rl, sentiment
 async def lifespan(app: FastAPI):
     Path(os.environ.get("PARQUET_DIR", "./data/parquet")).mkdir(parents=True, exist_ok=True)
     Path(os.environ.get("MODELS_DIR", "./data/models")).mkdir(parents=True, exist_ok=True)
+    fundamentals.warm_benchmark_cache()
     yield
 
 
