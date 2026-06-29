@@ -1,7 +1,8 @@
 export type TickerSearchOption = { symbol: string; name?: string; aliases?: string[] };
 
 const FALLBACK_ALIASES: Record<string, string[]> = {
-  RKLB: ["SpaceX", "Space X", "Rocket Lab"],
+  SPCX: ["SpaceX", "Space X", "Space Exploration Technologies"],
+  RKLB: ["Rocket Lab"],
   SPCE: ["Virgin Galactic"],
 };
 
@@ -41,14 +42,6 @@ function tickerAliases(ticker: TickerSearchOption): string[] {
   return ticker.aliases?.length ? ticker.aliases : (FALLBACK_ALIASES[ticker.symbol] ?? []);
 }
 
-export function isSpaceXQuery(query: string): boolean {
-  return normalizeSearchText(query) === "SPACEX";
-}
-
-export function tickerSearchHint(query: string): string | null {
-  if (!isSpaceXQuery(query)) return null;
-  return "SpaceX is not publicly traded. Try RKLB (Rocket Lab) or SPCE (Virgin Galactic).";
-}
 
 function scoreTicker(query: string, ticker: TickerSearchOption): number | null {
   const symbol = normalizeSearchText(ticker.symbol);

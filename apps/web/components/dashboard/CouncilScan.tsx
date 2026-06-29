@@ -19,6 +19,10 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { CouncilModelPicker } from "./CouncilModelPicker";
 import { HorizonPicker } from "./HorizonPicker";
+import { cn } from "@/lib/utils";
+import { LOCAL_GEMMA_PROVIDER_ID } from "@/lib/llm/activeProviders";
+import type { Action, Horizon } from "@/lib/llm/schema";
+import { searchTickers } from "@/lib/tickerSearch";
 
 type PerModelEntry = {
   provider: string;
@@ -154,15 +158,26 @@ function ReasonsDisplay({
     </div>
   );
 }
-import { cn } from "@/lib/utils";
-import { LOCAL_GEMMA_PROVIDER_ID } from "@/lib/llm/activeProviders";
-import type { Action, Horizon } from "@/lib/llm/schema";
-import { searchTickers, tickerSearchHint } from "@/lib/tickerSearch";
 
 const DEFAULT_LOCAL_PROVIDER_ID = LOCAL_GEMMA_PROVIDER_ID;
 const EXPANDED_STORAGE_KEY = "council-watchlist-expanded";
 const HORIZON_STORAGE_KEY = "council-watchlist-horizon";
 const OPTIONS_OPEN_KEY = "council-watchlist-options-open";
+
+function formatDecisionUpdatedAt(timestamp: number): { date: string; time: string } {
+  const value = new Date(timestamp);
+  return {
+    date: value.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+    time: value.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+  };
+}
 
 function loadHorizon(): Horizon {
   if (typeof window === "undefined") return "years";
@@ -429,8 +444,6 @@ export function CouncilScan({
     return searchTickers(query, (tickers ?? []) as TickerRow[]);
   }, [query, tickers]);
 
-  const searchHint = useMemo(() => tickerSearchHint(query), [query]);
-
   const decisionMap = (decisions ?? {}) as Record<string, DecisionDoc | null>;
 
   const counts = useMemo(() => {
@@ -666,11 +679,6 @@ export function CouncilScan({
           />
           {query && searchResults.length > 0 ? (
             <div className="absolute left-0 right-0 top-10 z-30 max-h-60 overflow-auto rounded-lg border border-zinc-200/80 bg-surface p-1 shadow-diffuse dark:border-zinc-700/80">
-              {searchHint ? (
-                <p className="border-b border-zinc-200/70 px-2 py-2 text-[10px] leading-relaxed text-steel dark:border-zinc-700/70">
-                  {searchHint}
-                </p>
-              ) : null}
               {searchResults.map((t) => {
                 const owned = watchSymbols.has(t.symbol.toUpperCase());
                 return (
@@ -695,7 +703,7 @@ export function CouncilScan({
           ) : null}
           {query && searchResults.length === 0 ? (
             <div className="absolute left-0 right-0 top-10 z-30 rounded-lg border border-zinc-200/80 bg-surface px-3 py-2 text-xs text-steel shadow-diffuse dark:border-zinc-700/80">
-              {searchHint ?? "No matching tickers found."}
+              No matching tickers found.
             </div>
           ) : null}
         </div>
@@ -801,6 +809,7 @@ function FragmentRow({
 }) {
   const confPct = decision ? Math.round(decision.confidence * 100) : null;
   const badgeClasses = confidenceBadge(decision?.action, decision?.confidence);
+  const updatedAt = decision ? formatDecisionUpdatedAt(decision.timestamp) : null;
   const tickerHref = `/ticker/${encodeURIComponent(symbol)}`;
   return (
     <>
@@ -865,7 +874,14 @@ function FragmentRow({
         </td>
         <td className="py-3 text-xs text-steel">{decision?.horizon ?? "—"}</td>
         <td className="py-3 text-xs text-steel">
-          {decision ? new Date(decision.timestamp).toLocaleDateString() : "—"}
+          {updatedAt ? (
+            <div className="flex flex-col leading-tight">
+              <span>{updatedAt.date}</span>
+              <span className="text-[10px] text-steel/80">{updatedAt.time}</span>
+            </div>
+          ) : (
+            "—"
+          )}
         </td>
         <td className="py-3 pr-4">
           <div className="flex items-center justify-end gap-1">

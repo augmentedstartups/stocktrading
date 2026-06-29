@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { syncDefaultWatchlist } from "./tickerPresets";
 
 export const list = query({
   args: { userId: v.id("users") },
@@ -61,20 +62,6 @@ export const toggleFavorite = mutation({
 export const seedDefault = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    const defaults = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY", "QQQ", "NPN.JO"];
-    for (const symbol of defaults) {
-      const ex = await ctx.db
-        .query("watchlist")
-        .withIndex("by_user_symbol", (q) => q.eq("userId", userId).eq("symbol", symbol))
-        .first();
-      if (!ex) {
-        await ctx.db.insert("watchlist", {
-          userId,
-          symbol,
-          favorite: ["AAPL", "NVDA"].includes(symbol),
-          addedAt: Date.now(),
-        });
-      }
-    }
+    await syncDefaultWatchlist(ctx, userId);
   },
 });

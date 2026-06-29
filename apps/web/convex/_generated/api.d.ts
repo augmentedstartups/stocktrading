@@ -17,6 +17,7 @@ import type * as modelPerformance from "../modelPerformance.js";
 import type * as news from "../news.js";
 import type * as settings from "../settings.js";
 import type * as signals from "../signals.js";
+import type * as tickerPresets from "../tickerPresets.js";
 import type * as tickers from "../tickers.js";
 import type * as users from "../users.js";
 import type * as watchlist from "../watchlist.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   news: typeof news;
   settings: typeof settings;
   signals: typeof signals;
+  tickerPresets: typeof tickerPresets;
   tickers: typeof tickers;
   users: typeof users;
   watchlist: typeof watchlist;

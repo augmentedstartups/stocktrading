@@ -1,5 +1,5 @@
 import { mutation } from "./_generated/server";
-import { syncTickerPresets } from "./tickerPresets";
+import { syncDefaultWatchlist, syncTickerPresets } from "./tickerPresets";
 
 export const bootstrap = mutation({
   args: {},
@@ -43,22 +43,7 @@ export const bootstrap = mutation({
     }
 
     await syncTickerPresets(ctx);
-
-    const defaults = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY", "QQQ", "NPN.JO"];
-    for (const symbol of defaults) {
-      const ex = await ctx.db
-        .query("watchlist")
-        .withIndex("by_user_symbol", (q) => q.eq("userId", uid).eq("symbol", symbol))
-        .first();
-      if (!ex) {
-        await ctx.db.insert("watchlist", {
-          userId: uid,
-          symbol,
-          favorite: ["AAPL", "NVDA"].includes(symbol),
-          addedAt: Date.now(),
-        });
-      }
-    }
+    await syncDefaultWatchlist(ctx, uid);
 
     return { userId: uid };
   },

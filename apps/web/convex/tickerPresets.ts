@@ -1,3 +1,4 @@
+import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 
 export type TickerPreset = {
@@ -78,12 +79,21 @@ export const TICKER_PRESETS: TickerPreset[] = [
   { symbol: "SPY", name: "SPDR S&P 500 ETF", market: "INDEX", currency: "USD" },
   { symbol: "QQQ", name: "Invesco QQQ Trust", market: "INDEX", currency: "USD" },
   {
+    symbol: "SPCX",
+    name: "Space Exploration Technologies Corp.",
+    market: "US",
+    currency: "USD",
+    sector: "Aerospace",
+    logoUrl: "https://logo.clearbit.com/spacex.com",
+    aliases: ["SpaceX", "Space X", "Space Exploration Technologies"],
+  },
+  {
     symbol: "RKLB",
     name: "Rocket Lab USA",
     market: "US",
     currency: "USD",
     sector: "Aerospace",
-    aliases: ["SpaceX", "Space X", "Rocket Lab"],
+    aliases: ["Rocket Lab"],
   },
   {
     symbol: "SPCE",
@@ -122,6 +132,37 @@ export const TICKER_PRESETS: TickerPreset[] = [
     sector: "Consumer Staples",
   },
 ];
+
+export const DEFAULT_WATCHLIST_SYMBOLS = [
+  "AAPL",
+  "MSFT",
+  "NVDA",
+  "GOOGL",
+  "META",
+  "AMZN",
+  "TSLA",
+  "SPY",
+  "QQQ",
+  "NPN.JO",
+  "SPCX",
+] as const;
+
+export async function syncDefaultWatchlist(ctx: MutationCtx, userId: Id<"users">) {
+  for (const symbol of DEFAULT_WATCHLIST_SYMBOLS) {
+    const ex = await ctx.db
+      .query("watchlist")
+      .withIndex("by_user_symbol", (q) => q.eq("userId", userId).eq("symbol", symbol))
+      .first();
+    if (!ex) {
+      await ctx.db.insert("watchlist", {
+        userId,
+        symbol,
+        favorite: ["AAPL", "NVDA", "SPCX"].includes(symbol),
+        addedAt: Date.now(),
+      });
+    }
+  }
+}
 
 export async function syncTickerPresets(ctx: MutationCtx) {
   for (const preset of TICKER_PRESETS) {

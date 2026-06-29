@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
+import { APP_VERSION } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
-
-const APP_VERSION = "v0.1.9";
 
 export default function DashboardLayout({
   children,
