@@ -53,10 +53,7 @@ Use citedHeadlines only from the provided article list when possible.`;
   if (gKey) {
     try {
       const google = createGoogleGenerativeAI({ apiKey: gKey });
-      const model =
-        process.env.GEMINI_FLASH_MODEL ??
-        process.env.GEMINI_FLASH_LITE_MODEL ??
-        "gemini-3.5-flash";
+      const model = process.env.GEMINI_FLASH_MODEL ?? "gemini-3.5-flash";
       const { text } = await generateText({
         model: google(model),
         system: sys,

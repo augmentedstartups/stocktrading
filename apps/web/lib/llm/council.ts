@@ -1,6 +1,10 @@
-import { councilSystemPrompt, councilUserPrompt } from "./prompts";
+import {
+  councilSystemPrompt,
+  councilUserPrompt,
+  type CouncilHeadline,
+} from "./prompts";
 import { askAnthropic, askAnthropicSonnet } from "./providers/anthropic";
-import { askGemini, askGeminiFlashLite } from "./providers/gemini";
+import { askGemini, askGemini35Flash } from "./providers/gemini";
 import { askGLM } from "./providers/glm";
 import { askKimi } from "./providers/kimi";
 import { askLocal } from "./providers/local";
@@ -23,6 +27,12 @@ export const COUNCIL_MODELS: CouncilModel[] = [
     run: (s, u) => askLocal(s, u),
   },
   {
+    id: "local/gemma-4-e4b-it-mlx",
+    provider: "local",
+    label: "LM Studio Gemma 4 E4B",
+    run: (s, u) => askLocal(s, u, "gemma-4-e4b-it-mlx"),
+  },
+  {
     id: `anthropic/${process.env.ANTHROPIC_COUNCIL_MODEL ?? "claude-opus-4-8"}`,
     provider: "anthropic",
     label: "Claude Opus 4.8",
@@ -41,21 +51,21 @@ export const COUNCIL_MODELS: CouncilModel[] = [
     run: (s, u) => askGemini(s, u),
   },
   {
-    id: `google/${process.env.GEMINI_FLASH_MODEL ?? process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-3.5-flash"}`,
+    id: `google/${process.env.GEMINI_FLASH_MODEL ?? "gemini-3.5-flash"}`,
     provider: "google",
     label: "Gemini 3.5 Flash",
-    run: (s, u) => askGeminiFlashLite(s, u),
+    run: (s, u) => askGemini35Flash(s, u),
   },
   {
-    id: `moonshot/${process.env.MOONSHOT_MODEL ?? "kimi-k2.6"}`,
+    id: `moonshot/${process.env.MOONSHOT_MODEL ?? "kimi-k2.7-code"}`,
     provider: "moonshot",
-    label: "Kimi K2.6",
+    label: "Kimi K2.7 Code",
     run: (s, u) => askKimi(s, u),
   },
   {
-    id: `zai/${process.env.ZAI_MODEL ?? "glm-5.1"}`,
+    id: `zai/${process.env.ZAI_MODEL ?? "glm-5.2"}`,
     provider: "zai",
-    label: "GLM 5.1",
+    label: "GLM 5.2",
     run: (s, u) => askGLM(s, u),
   },
   {
@@ -81,6 +91,7 @@ export async function runCouncil(ctx: {
   indicators: Record<string, unknown>;
   fundamentals?: Record<string, unknown>;
   sentiment?: SentimentSnapshot | null;
+  headlines?: CouncilHeadline[];
   rl?: { action: string; confidence: number; reason?: string };
   userHorizon?: string;
   activeProviders?: string[];

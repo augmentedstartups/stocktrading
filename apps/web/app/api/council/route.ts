@@ -1,9 +1,12 @@
 import { aggregateCouncil } from "@/lib/llm/aggregator";
 import { COUNCIL_MODELS, DEFAULT_COUNCIL_PROVIDER_ID, runCouncil } from "@/lib/llm/council";
+import { enrichCouncilResults } from "@/lib/llm/enrichReasons";
+import { headlinesFromArticles } from "@/lib/llm/prompts";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
-import { getActiveProviders, insertDecision } from "@/lib/convexServer";
+import { getActiveProviders, getUserHorizon, insertDecision } from "@/lib/convexServer";
 import { mlGet } from "@/lib/ml";
+import { parseHorizon } from "@/lib/llm/schema";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -51,7 +54,12 @@ export async function POST(req: Request) {
 
   const sentMl = await mlGet<{
     aggregate: { score: number; pos: number; neu: number; neg: number; n_articles: number };
-    articles: Array<{ title: string; url: string }>;
+    articles: Array<{
+      title: string;
+      url: string;
+      finbertScore?: number;
+      finbertLabel?: string;
+    }>;
   }>(`/sentiment?symbol=${encodeURIComponent(symbol)}`).catch(() => null);
 
   let sentiment = null;
@@ -87,17 +95,28 @@ export async function POST(req: Request) {
       ? [DEFAULT_COUNCIL_PROVIDER_ID]
       : activeProviders;
 
-  const results = await runCouncil({
-    symbol,
+  const horizon =
+    parseHorizon(userHorizon) ?? (await getUserHorizon(userId));
+
+  const reasonCtx = {
     indicators: ind.snapshot ?? {},
     fundamentals,
     sentiment,
+    headlines: sentMl ? headlinesFromArticles(sentMl.articles) : undefined,
     rl,
-    userHorizon,
-    activeProviders: providers,
-  });
+  };
 
-  const decision = aggregateCouncil({ symbol, results, rl });
+  const results = enrichCouncilResults(
+    await runCouncil({
+      symbol,
+      ...reasonCtx,
+      userHorizon: horizon,
+      activeProviders: providers,
+    }),
+    reasonCtx,
+  );
+
+  const decision = aggregateCouncil({ symbol, results, rl, userHorizon: horizon });
   const inputsUsed = {
     technical: Object.keys(ind.snapshot ?? {}).length > 0,
     fundamentals: Boolean(fundamentals && Object.keys(fundamentals).length > 0),
@@ -134,6 +153,7 @@ export async function POST(req: Request) {
         action: m.action,
         confidence: m.confidence,
         reason: m.reason,
+        reasons: m.reasons,
         latencyMs: m.latencyMs,
         timestamp: m.timestamp,
         ok: m.ok,

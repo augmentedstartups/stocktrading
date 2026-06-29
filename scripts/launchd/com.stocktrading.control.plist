@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.stocktrading.control</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/node</string>
+    <string>/Users/riteshkanjee/Documents/dev/stocktrading/services/control/server.mjs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/riteshkanjee/Documents/dev/stocktrading</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>WEB_URL</key>
+    <string>http://127.0.0.1:53947</string>
+    <key>ML_URL</key>
+    <string>http://127.0.0.1:58123</string>
+    <key>CONTROL_PORT</key>
+    <string>54827</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/riteshkanjee/Documents/dev/stocktrading/logs/com.stocktrading.control.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/riteshkanjee/Documents/dev/stocktrading/logs/com.stocktrading.control.err.log</string>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+</dict>
+</plist>

@@ -6,8 +6,9 @@ export function aggregateCouncil(opts: {
   results: ProviderResult[];
   rl?: { action: Action; confidence: number };
   modelWeights?: Record<string, number>;
+  userHorizon?: Horizon;
 }): Decision {
-  const { symbol, results, rl, modelWeights } = opts;
+  const { symbol, results, rl, modelWeights, userHorizon } = opts;
   let buyScore = 0;
   let sellScore = 0;
   let holdScore = 0;
@@ -107,19 +108,21 @@ export function aggregateCouncil(opts: {
   for (const r of results) {
     if (r.ok && r.verdict) {
       horizonVotes.push(r.verdict.horizon);
-      if (r.verdict.reasons[0]) reasons.push(`${r.model}: ${r.verdict.reasons[0]}`);
+      for (const reason of r.verdict.reasons) {
+        if (reason.trim()) reasons.push(`${r.model}: ${reason}`);
+      }
     }
   }
   if (reasons.length === 0) reasons.push("Insufficient convergent model output; defaulting to conservative synthesis.");
 
-  const horizon = pickHorizon(horizonVotes);
+  const horizon = userHorizon ?? pickHorizon(horizonVotes);
 
   return {
     symbol,
     action,
     confidence,
     horizon,
-    reasons: reasons.slice(0, 6),
+    reasons: reasons.slice(0, 12),
     perModel,
     rlInput: rl,
   };

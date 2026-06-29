@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { syncTickerPresets } from "./tickerPresets";
 
 export const list = query({
   args: {},
@@ -26,6 +27,7 @@ export const upsert = mutation({
     sector: v.optional(v.string()),
     currency: v.string(),
     logoUrl: v.optional(v.string()),
+    aliases: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -43,35 +45,6 @@ export const upsert = mutation({
 export const seedPresets = mutation({
   args: {},
   handler: async (ctx) => {
-    const presets: Array<{
-      symbol: string;
-      name: string;
-      market: "US" | "JSE" | "INDEX";
-      currency: string;
-      sector?: string;
-      logoUrl?: string;
-    }> = [
-      { symbol: "AAPL", name: "Apple Inc.", market: "US", currency: "USD", sector: "Technology", logoUrl: "https://logo.clearbit.com/apple.com" },
-      { symbol: "MSFT", name: "Microsoft Corp.", market: "US", currency: "USD", sector: "Technology", logoUrl: "https://logo.clearbit.com/microsoft.com" },
-      { symbol: "GOOGL", name: "Alphabet Inc.", market: "US", currency: "USD", sector: "Technology", logoUrl: "https://logo.clearbit.com/abc.xyz" },
-      { symbol: "META", name: "Meta Platforms", market: "US", currency: "USD", sector: "Technology", logoUrl: "https://logo.clearbit.com/meta.com" },
-      { symbol: "AMZN", name: "Amazon.com", market: "US", currency: "USD", sector: "Consumer Discretionary", logoUrl: "https://logo.clearbit.com/amazon.com" },
-      { symbol: "NVDA", name: "NVIDIA Corp.", market: "US", currency: "USD", sector: "Semiconductors", logoUrl: "https://logo.clearbit.com/nvidia.com" },
-      { symbol: "INTC", name: "Intel Corp.", market: "US", currency: "USD", sector: "Semiconductors", logoUrl: "https://logo.clearbit.com/intel.com" },
-      { symbol: "TSLA", name: "Tesla Inc.", market: "US", currency: "USD", sector: "Consumer Discretionary", logoUrl: "https://logo.clearbit.com/tesla.com" },
-      { symbol: "SPY", name: "SPDR S&P 500 ETF", market: "INDEX", currency: "USD" },
-      { symbol: "QQQ", name: "Invesco QQQ Trust", market: "INDEX", currency: "USD" },
-      { symbol: "NPN.JO", name: "Naspers Ltd", market: "JSE", currency: "ZAR", sector: "Communication Services" },
-      { symbol: "FSR.JO", name: "FirstRand Ltd", market: "JSE", currency: "ZAR", sector: "Financials" },
-      { symbol: "SBK.JO", name: "Standard Bank Group", market: "JSE", currency: "ZAR", sector: "Financials" },
-      { symbol: "SHP.JO", name: "Shoprite Holdings", market: "JSE", currency: "ZAR", sector: "Consumer Staples" },
-    ];
-    for (const p of presets) {
-      const ex = await ctx.db
-        .query("tickers")
-        .withIndex("by_symbol", (q) => q.eq("symbol", p.symbol))
-        .first();
-      if (!ex) await ctx.db.insert("tickers", p);
-    }
+    await syncTickerPresets(ctx);
   },
 });

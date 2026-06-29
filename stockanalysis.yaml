@@ -278,13 +278,15 @@ workflows:
       - POST /council { "symbol": "AAPL" }
 
 council_model_ids:
-  - anthropic/claude-opus-4-7
+  - local/google/gemma-4-12b
+  - local/gemma-4-e4b-it-mlx
+  - anthropic/claude-opus-4-8
   - anthropic/claude-sonnet-4-6
   - google/gemini-3.1-pro-preview
-  - google/gemini-3.1-flash-lite-preview
-  - moonshot/kimi-k2.6
-  - zai/glm-5.1
-  - minimax/MiniMax-M2.7
+  - google/gemini-3.5-flash
+  - moonshot/kimi-k2.7-code
+  - zai/glm-5.2
+  - minimax/MiniMax-M3
 
 examples:
   health: curl -s http://127.0.0.1:54827/health

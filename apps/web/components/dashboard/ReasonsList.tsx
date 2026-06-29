@@ -32,14 +32,31 @@ function pillTone(provider: string, action: Action) {
 }
 
 function rowsFromPerModel(perModel: PerModelReason[]) {
-  return perModel
-    .filter((m) => m.ok && (m.reason || m.reasons?.[0]))
-    .map((m) => ({
-      model: m.model,
-      provider: m.provider,
-      action: m.action,
-      text: m.reason || m.reasons?.[0] || "",
-    }));
+  const rows: Array<{
+    model: string;
+    provider: string;
+    action: Action;
+    text: string;
+  }> = [];
+  for (const m of perModel) {
+    if (!m.ok) continue;
+    const bullets =
+      m.reasons && m.reasons.length > 0
+        ? m.reasons
+        : m.reason
+          ? [m.reason]
+          : [];
+    for (const text of bullets) {
+      if (!text) continue;
+      rows.push({
+        model: m.model,
+        provider: m.provider,
+        action: m.action,
+        text,
+      });
+    }
+  }
+  return rows;
 }
 
 function rowsFromStrings(reasons: string[]) {

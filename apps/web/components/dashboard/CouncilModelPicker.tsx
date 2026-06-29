@@ -11,10 +11,12 @@ export function CouncilModelPicker({
   selected,
   onChange,
   defaultIds,
+  compact = false,
 }: {
   selected: string[];
   onChange: (ids: string[]) => void;
   defaultIds?: string[];
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<CouncilModelMeta[]>([]);
@@ -77,14 +79,15 @@ export function CouncilModelPicker({
   };
 
   return (
-    <div ref={containerRef} className="relative flex flex-col gap-2">
-      <span className="text-xs font-medium uppercase tracking-[0.18em] text-steel">
+    <div ref={containerRef} className="relative flex flex-col gap-1.5">
+      <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-steel">
         Models
       </span>
       <Button
         type="button"
         variant="outline"
         size="sm"
+        className={compact ? "h-7" : undefined}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >

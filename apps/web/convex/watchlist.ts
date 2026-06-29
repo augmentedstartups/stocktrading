@@ -13,7 +13,14 @@ export const list = query({
 
 export const add = mutation({
   args: { userId: v.id("users"), symbol: v.string() },
+  returns: v.id("watchlist"),
   handler: async (ctx, { userId, symbol }) => {
+    const ticker = await ctx.db
+      .query("tickers")
+      .withIndex("by_symbol", (q) => q.eq("symbol", symbol))
+      .first();
+    if (!ticker) throw new Error(`Ticker ${symbol} not found`);
+
     const ex = await ctx.db
       .query("watchlist")
       .withIndex("by_user_symbol", (q) => q.eq("userId", userId).eq("symbol", symbol))

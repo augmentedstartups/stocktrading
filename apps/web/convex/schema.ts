@@ -27,6 +27,7 @@ export default defineSchema({
     sector: v.optional(v.string()),
     currency: v.string(),
     logoUrl: v.optional(v.string()),
+    aliases: v.optional(v.array(v.string())),
   }).index("by_symbol", ["symbol"]),
 
   watchlist: defineTable({

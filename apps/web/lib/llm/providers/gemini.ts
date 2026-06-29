@@ -52,11 +52,10 @@ export async function askGemini(
   }
 }
 
-export async function askGeminiFlashLite(
+export async function askGemini35Flash(
   system: string,
   user: string,
 ): Promise<ProviderResult> {
-  const model =
-    process.env.GEMINI_FLASH_MODEL ?? process.env.GEMINI_FLASH_LITE_MODEL ?? "gemini-3.5-flash";
+  const model = process.env.GEMINI_FLASH_MODEL ?? "gemini-3.5-flash";
   return askGemini(system, user, model);
 }

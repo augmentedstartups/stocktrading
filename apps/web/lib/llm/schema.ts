@@ -14,6 +14,13 @@ export type Verdict = z.infer<typeof verdictSchema>;
 export type Action = z.infer<typeof actionSchema>;
 export type Horizon = z.infer<typeof horizonSchema>;
 
+export function parseHorizon(value: string | undefined): Horizon | undefined {
+  if (value === "days" || value === "weeks" || value === "months" || value === "years") {
+    return value;
+  }
+  return undefined;
+}
+
 export const decisionSchema = z.object({
   symbol: z.string(),
   action: actionSchema,

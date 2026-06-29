@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { BootstrapClient } from "./BootstrapClient";
 import { CouncilModelPicker } from "./CouncilModelPicker";
+import { HorizonPicker } from "./HorizonPicker";
 import { DecisionCard } from "./DecisionCard";
 import { IndicatorRail } from "./IndicatorRail";
 import { NewsList } from "./NewsList";
@@ -17,7 +18,7 @@ import { SentimentMeter } from "./SentimentMeter";
 import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
 import { TickerCombobox } from "./TickerCombobox";
 import { WatchlistTable } from "./WatchlistTable";
-import type { Action } from "@/lib/llm/schema";
+import type { Action, Horizon } from "@/lib/llm/schema";
 
 const DEFAULT_LOCAL_PROVIDER_ID = "local/google/gemma-4-12b";
 
@@ -155,6 +156,7 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
   const [loading, setLoading] = useState(false);
   const [decision, setDecision] = useState<DecisionShape | null>(null);
   const [activeProviders, setActiveProviders] = useState<string[]>([DEFAULT_LOCAL_PROVIDER_ID]);
+  const [horizon, setHorizon] = useState<Horizon>("years");
   const [candles, setCandles] = useState<Candle[]>([]);
   const [series, setSeries] = useState<IndSeries[]>([]);
   const [news, setNews] = useState<
@@ -194,7 +196,7 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
       const r = await fetch("/api/council", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol, persist: false, activeProviders }),
+        body: JSON.stringify({ symbol, persist: false, activeProviders, userHorizon: horizon }),
       });
       const j = await readJsonBody<{ decision?: DecisionShape }>(r);
       if (j?.decision) setDecision(j.decision);
@@ -210,6 +212,8 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
       onPeriodChange={setPeriod}
       activeProviders={activeProviders}
       onProvidersChange={setActiveProviders}
+      horizon={horizon}
+      onHorizonChange={setHorizon}
       onSymbolChange={(next) => router.push(`/ticker/${encodeURIComponent(next)}`)}
       tickerOptions={OFFLINE_TICKERS}
       watchlistCount={0}
@@ -274,6 +278,7 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
   const [localDecision, setLocalDecision] = useState<DecisionShape | null>(null);
   const [localInputsUsed, setLocalInputsUsed] = useState<InputsUsed | null>(null);
   const [activeProviders, setActiveProviders] = useState<string[]>([]);
+  const [horizon, setHorizon] = useState<Horizon>("years");
   const [candles, setCandles] = useState<Candle[]>([]);
   const [series, setSeries] = useState<IndSeries[]>([]);
   const [news, setNews] = useState<
@@ -296,7 +301,10 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
     } else {
       setActiveProviders([DEFAULT_LOCAL_PROVIDER_ID]);
     }
-  }, [settings?.activeProviders]);
+    if (settings?.horizon) {
+      setHorizon(settings.horizon);
+    }
+  }, [settings?.activeProviders, settings?.horizon]);
 
   const indicators = (settings?.indicators ?? []) as string[];
   const active = useMemo(() => new Set<string>(indicators), [indicators]);
@@ -352,6 +360,7 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
           persist: true,
           userId: uid ?? undefined,
           activeProviders: providers,
+          userHorizon: horizon,
         }),
       });
       const j = await readJsonBody<{ decision?: DecisionShape; inputsUsed?: InputsUsed; error?: string }>(r);
@@ -387,10 +396,16 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
   const fav = useMutation(api.watchlist.toggleFavorite);
   const setIndicatorsMut = useMutation(api.settings.setIndicators);
   const setProvidersMut = useMutation(api.settings.setActiveProviders);
+  const setHorizonMut = useMutation(api.settings.setHorizon);
 
   const setActiveProvidersAndSave = (next: string[]) => {
     setActiveProviders(next);
     if (uid) void setProvidersMut({ userId: uid, activeProviders: next });
+  };
+
+  const setHorizonAndSave = (next: Horizon) => {
+    setHorizon(next);
+    if (uid) void setHorizonMut({ userId: uid, horizon: next });
   };
 
   const watchlistSheet = (
@@ -418,6 +433,8 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
       activeProviders={activeProviders}
       onProvidersChange={setActiveProvidersAndSave}
       defaultProviderIds={settings?.activeProviders ?? []}
+      horizon={horizon}
+      onHorizonChange={setHorizonAndSave}
       onSymbolChange={(next) => router.push(`/ticker/${encodeURIComponent(next)}`)}
       tickerOptions={[
         ...((wl ?? []) as Array<{ symbol: string }>).map((w) => ({ symbol: w.symbol })),
@@ -453,6 +470,8 @@ function TickerDetailLayout({
   activeProviders,
   onProvidersChange,
   defaultProviderIds,
+  horizon,
+  onHorizonChange,
   onSymbolChange,
   tickerOptions,
   watchlistCount,
@@ -480,6 +499,8 @@ function TickerDetailLayout({
   activeProviders: string[];
   onProvidersChange: (ids: string[]) => void;
   defaultProviderIds?: string[];
+  horizon: Horizon;
+  onHorizonChange: (horizon: Horizon) => void;
   onSymbolChange: (symbol: string) => void;
   tickerOptions: Array<{ symbol: string; name?: string }>;
   watchlistCount: number;
@@ -533,6 +554,7 @@ function TickerDetailLayout({
                   ))}
                 </div>
               </div>
+              <HorizonPicker value={horizon} onChange={onHorizonChange} />
               <CouncilModelPicker
                 selected={activeProviders}
                 onChange={onProvidersChange}

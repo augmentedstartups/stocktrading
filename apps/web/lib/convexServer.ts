@@ -26,6 +26,22 @@ export async function getActiveProviders(
   return undefined;
 }
 
+export async function getUserHorizon(
+  userId: string | undefined,
+): Promise<"days" | "weeks" | "months" | "years" | undefined> {
+  if (!userId) return undefined;
+  const client = getConvexServer();
+  if (!client) return undefined;
+  try {
+    const settings = (await client.query(api.settings.get, {
+      userId: userId as never,
+    })) as { horizon?: "days" | "weeks" | "months" | "years" } | null;
+    return settings?.horizon;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function bootstrapDashboard() {
   const client = getConvexServer();
   if (!client) return { offline: true as const };

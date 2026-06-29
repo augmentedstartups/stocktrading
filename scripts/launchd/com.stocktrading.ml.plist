@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.stocktrading.ml</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/riteshkanjee/Documents/dev/stocktrading/services/ml/.venv/bin/uvicorn</string>
+    <string>api.main:app</string>
+    <string>--host</string>
+    <string>0.0.0.0</string>
+    <string>--port</string>
+    <string>58123</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/riteshkanjee/Documents/dev/stocktrading/services/ml</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/riteshkanjee/Documents/dev/stocktrading/logs/com.stocktrading.ml.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/riteshkanjee/Documents/dev/stocktrading/logs/com.stocktrading.ml.err.log</string>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+</dict>
+</plist>

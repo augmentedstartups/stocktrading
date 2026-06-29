@@ -1,9 +1,12 @@
 import { aggregateCouncil } from "@/lib/llm/aggregator";
 import { COUNCIL_MODELS, DEFAULT_COUNCIL_PROVIDER_ID, runCouncil } from "@/lib/llm/council";
+import { enrichCouncilResults } from "@/lib/llm/enrichReasons";
+import { headlinesFromArticles } from "@/lib/llm/prompts";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
-import { getActiveProviders, insertDecision } from "@/lib/convexServer";
+import { getActiveProviders, getUserHorizon, insertDecision } from "@/lib/convexServer";
 import { mlGet } from "@/lib/ml";
+import { parseHorizon, type Horizon } from "@/lib/llm/schema";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -41,7 +44,7 @@ function evidenceEntries(source: Record<string, unknown> | undefined, limit = 8)
 
 async function runOne(
   symbol: string,
-  userHorizon: string | undefined,
+  userHorizon: Horizon | undefined,
   userId: string | undefined,
   persist: boolean,
   activeProviders: string[] | undefined,
@@ -63,7 +66,12 @@ async function runOne(
 
     const sentMl = await mlGet<{
       aggregate: { score: number; pos: number; neu: number; neg: number; n_articles: number };
-      articles: Array<{ title: string; url: string }>;
+      articles: Array<{
+        title: string;
+        url: string;
+        finbertScore?: number;
+        finbertLabel?: string;
+      }>;
     }>(`/sentiment?symbol=${encodeURIComponent(symbol)}`).catch(() => null);
 
     const sentiment = sentMl
@@ -89,17 +97,25 @@ async function runOne(
         ? { action: rlRaw.action as Action, confidence: rlRaw.confidence }
         : undefined;
 
-    const results = await runCouncil({
-      symbol,
+    const reasonCtx = {
       indicators: ind.snapshot ?? {},
       fundamentals,
       sentiment,
+      headlines: sentMl ? headlinesFromArticles(sentMl.articles) : undefined,
       rl,
-      userHorizon,
-      activeProviders,
-    });
+    };
 
-    const decision = aggregateCouncil({ symbol, results, rl });
+    const results = enrichCouncilResults(
+      await runCouncil({
+        symbol,
+        ...reasonCtx,
+        userHorizon,
+        activeProviders,
+      }),
+      reasonCtx,
+    );
+
+    const decision = aggregateCouncil({ symbol, results, rl, userHorizon });
     const inputsUsed = {
       technical: Object.keys(ind.snapshot ?? {}).length > 0,
       fundamentals: Boolean(fundamentals && Object.keys(fundamentals).length > 0),
@@ -188,12 +204,14 @@ export async function POST(req: Request) {
   }
   const {
     symbols,
-    userHorizon,
+    userHorizon: bodyHorizon,
     userId,
     persist = true,
     activeProviders: bodyProviders,
     concurrency = 2,
   } = parsed.data;
+
+  const horizon = parseHorizon(bodyHorizon) ?? (await getUserHorizon(userId));
 
   const unique = Array.from(new Set(symbols.map((s) => s.trim()).filter(Boolean)));
   const rawActiveProviders =
@@ -210,7 +228,7 @@ export async function POST(req: Request) {
       : activeProviders;
   const results = await withConcurrency(
     unique,
-    (sym) => runOne(sym, userHorizon, userId, persist, providers),
+    (sym) => runOne(sym, horizon, userId, persist, providers),
     concurrency,
   );
 

@@ -30,12 +30,13 @@ export const ensure = mutation({
       horizon: "years",
       activeProviders: [
         "local/google/gemma-4-12b",
+        "local/gemma-4-e4b-it-mlx",
         "anthropic/claude-opus-4-8",
         "anthropic/claude-sonnet-4-6",
         "google/gemini-3.1-pro-preview",
         "google/gemini-3.5-flash",
-        "moonshot/kimi-k2.6",
-        "zai/glm-5.1",
+        "moonshot/kimi-k2.7-code",
+        "zai/glm-5.2",
         "minimax/MiniMax-M3",
       ],
       indicators: DEFAULT_INDICATORS,
@@ -65,6 +66,26 @@ export const setActiveProviders = mutation({
       .first();
     if (!s) throw new Error("settings missing");
     await ctx.db.patch(s._id, { activeProviders });
+  },
+});
+
+export const setHorizon = mutation({
+  args: {
+    userId: v.id("users"),
+    horizon: v.union(
+      v.literal("days"),
+      v.literal("weeks"),
+      v.literal("months"),
+      v.literal("years"),
+    ),
+  },
+  handler: async (ctx, { userId, horizon }) => {
+    const s = await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (!s) throw new Error("settings missing");
+    await ctx.db.patch(s._id, { horizon });
   },
 });
 

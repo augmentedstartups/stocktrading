@@ -1,5 +1,5 @@
-import { CouncilScan } from "@/components/dashboard/CouncilScan";
+import { redirect } from "next/navigation";
 
 export default function ScanPage() {
-  return <CouncilScan />;
+  redirect("/watchlist");
 }

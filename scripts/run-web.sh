@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT/apps/web"
-exec /opt/homebrew/bin/node "$ROOT/apps/web/node_modules/next/dist/bin/next" start -p 53947
+WEB="$ROOT/apps/web"
+NEXT="$WEB/node_modules/next/dist/bin/next"
+PNPM="/opt/homebrew/bin/pnpm"
+NODE="/opt/homebrew/bin/node"
+
+if [[ ! -f "$WEB/.next/BUILD_ID" ]]; then
+  echo "No production build found — building…" >&2
+  cd "$ROOT" && "$PNPM" build
+fi
+
+cd "$WEB"
+exec "$NODE" "$NEXT" start -p 53947

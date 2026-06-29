@@ -1,4 +1,5 @@
 import { mutation } from "./_generated/server";
+import { syncTickerPresets } from "./tickerPresets";
 
 export const bootstrap = mutation({
   args: {},
@@ -27,12 +28,13 @@ export const bootstrap = mutation({
         horizon: "years",
         activeProviders: [
           "local/google/gemma-4-12b",
+          "local/gemma-4-e4b-it-mlx",
           "anthropic/claude-opus-4-8",
           "anthropic/claude-sonnet-4-6",
           "google/gemini-3.1-pro-preview",
           "google/gemini-3.5-flash",
-          "moonshot/kimi-k2.6",
-          "zai/glm-5.1",
+          "moonshot/kimi-k2.7-code",
+          "zai/glm-5.2",
           "minimax/MiniMax-M3",
         ],
         indicators: ["MA50", "MA200", "RSI", "Volume", "News"],
@@ -40,116 +42,7 @@ export const bootstrap = mutation({
       });
     }
 
-    const presets: Array<{
-      symbol: string;
-      name: string;
-      market: "US" | "JSE" | "INDEX";
-      currency: string;
-      sector?: string;
-      logoUrl?: string;
-    }> = [
-      {
-        symbol: "AAPL",
-        name: "Apple Inc.",
-        market: "US",
-        currency: "USD",
-        sector: "Technology",
-        logoUrl: "https://logo.clearbit.com/apple.com",
-      },
-      {
-        symbol: "MSFT",
-        name: "Microsoft Corp.",
-        market: "US",
-        currency: "USD",
-        sector: "Technology",
-        logoUrl: "https://logo.clearbit.com/microsoft.com",
-      },
-      {
-        symbol: "GOOGL",
-        name: "Alphabet Inc.",
-        market: "US",
-        currency: "USD",
-        sector: "Technology",
-        logoUrl: "https://logo.clearbit.com/abc.xyz",
-      },
-      {
-        symbol: "META",
-        name: "Meta Platforms",
-        market: "US",
-        currency: "USD",
-        sector: "Technology",
-        logoUrl: "https://logo.clearbit.com/meta.com",
-      },
-      {
-        symbol: "AMZN",
-        name: "Amazon.com",
-        market: "US",
-        currency: "USD",
-        sector: "Consumer Discretionary",
-        logoUrl: "https://logo.clearbit.com/amazon.com",
-      },
-      {
-        symbol: "NVDA",
-        name: "NVIDIA Corp.",
-        market: "US",
-        currency: "USD",
-        sector: "Semiconductors",
-        logoUrl: "https://logo.clearbit.com/nvidia.com",
-      },
-      {
-        symbol: "INTC",
-        name: "Intel Corp.",
-        market: "US",
-        currency: "USD",
-        sector: "Semiconductors",
-        logoUrl: "https://logo.clearbit.com/intel.com",
-      },
-      {
-        symbol: "TSLA",
-        name: "Tesla Inc.",
-        market: "US",
-        currency: "USD",
-        sector: "Consumer Discretionary",
-        logoUrl: "https://logo.clearbit.com/tesla.com",
-      },
-      { symbol: "SPY", name: "SPDR S&P 500 ETF", market: "INDEX", currency: "USD" },
-      { symbol: "QQQ", name: "Invesco QQQ Trust", market: "INDEX", currency: "USD" },
-      {
-        symbol: "NPN.JO",
-        name: "Naspers Ltd",
-        market: "JSE",
-        currency: "ZAR",
-        sector: "Communication Services",
-      },
-      {
-        symbol: "FSR.JO",
-        name: "FirstRand Ltd",
-        market: "JSE",
-        currency: "ZAR",
-        sector: "Financials",
-      },
-      {
-        symbol: "SBK.JO",
-        name: "Standard Bank Group",
-        market: "JSE",
-        currency: "ZAR",
-        sector: "Financials",
-      },
-      {
-        symbol: "SHP.JO",
-        name: "Shoprite Holdings",
-        market: "JSE",
-        currency: "ZAR",
-        sector: "Consumer Staples",
-      },
-    ];
-    for (const p of presets) {
-      const ex = await ctx.db
-        .query("tickers")
-        .withIndex("by_symbol", (q) => q.eq("symbol", p.symbol))
-        .first();
-      if (!ex) await ctx.db.insert("tickers", p);
-    }
+    await syncTickerPresets(ctx);
 
     const defaults = ["AAPL", "MSFT", "NVDA", "GOOGL", "META", "AMZN", "TSLA", "SPY", "QQQ", "NPN.JO"];
     for (const symbol of defaults) {
