@@ -400,6 +400,8 @@ export function CouncilScan({
   const removeFromWatch = useMutation(api.watchlist.remove);
 
   const [query, setQuery] = useState("");
+  const [remoteTickerResults, setRemoteTickerResults] = useState<TickerRow[]>([]);
+  const [tickerSearchLoading, setTickerSearchLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
@@ -440,9 +442,55 @@ export function CouncilScan({
     [watchlist],
   );
 
+  const normalizedQuery = query.trim().toUpperCase();
+
+  useEffect(() => {
+    if (!normalizedQuery) {
+      setRemoteTickerResults([]);
+      setTickerSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setTickerSearchLoading(true);
+    const timeout = window.setTimeout(() => {
+      void fetch(`/api/tickers/search?q=${encodeURIComponent(normalizedQuery)}`, {
+        signal: controller.signal,
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data: { results?: TickerRow[] } | null) => {
+          setRemoteTickerResults(data?.results ?? []);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setRemoteTickerResults([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setTickerSearchLoading(false);
+        });
+    }, 200);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [normalizedQuery]);
+
   const searchResults = useMemo(() => {
-    return searchTickers(query, (tickers ?? []) as TickerRow[]);
-  }, [query, tickers]);
+    const seen = new Set<string>();
+    return [...searchTickers(query, (tickers ?? []) as TickerRow[], 25), ...remoteTickerResults]
+      .map((ticker) => ({
+        ...ticker,
+        symbol: ticker.symbol.toUpperCase(),
+        name: ticker.name ?? ticker.symbol.toUpperCase(),
+      }))
+      .filter((ticker) => {
+        if (seen.has(ticker.symbol)) return false;
+        seen.add(ticker.symbol);
+        return true;
+      });
+  }, [query, remoteTickerResults, tickers]);
+
+  const showNoResults = Boolean(query) && !tickerSearchLoading && searchResults.length === 0;
 
   const decisionMap = (decisions ?? {}) as Record<string, DecisionDoc | null>;
 
@@ -571,9 +619,14 @@ export function CouncilScan({
     setExpanded(new Set(watchlist.map((w) => w.symbol)));
   };
 
-  const addSymbol = async (sym: string) => {
+  const addSymbol = async (ticker: TickerRow) => {
     if (!uid) return;
-    await addToWatch({ userId: uid as Id<"users">, symbol: sym.toUpperCase() });
+    await addToWatch({
+      userId: uid as Id<"users">,
+      symbol: ticker.symbol.toUpperCase(),
+      name: ticker.name,
+      market: "GLOBAL",
+    });
     setQuery("");
   };
 
@@ -685,7 +738,7 @@ export function CouncilScan({
                   <button
                     key={t.symbol}
                     type="button"
-                    onClick={() => void addSymbol(t.symbol)}
+                    onClick={() => void addSymbol(t)}
                     disabled={owned || !uid}
                     className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-zinc-800"
                   >
@@ -701,7 +754,12 @@ export function CouncilScan({
               })}
             </div>
           ) : null}
-          {query && searchResults.length === 0 ? (
+          {query && tickerSearchLoading && searchResults.length === 0 ? (
+            <div className="absolute left-0 right-0 top-10 z-30 rounded-lg border border-zinc-200/80 bg-surface px-3 py-2 text-xs text-steel shadow-diffuse dark:border-zinc-700/80">
+              Searching global markets…
+            </div>
+          ) : null}
+          {showNoResults ? (
             <div className="absolute left-0 right-0 top-10 z-30 rounded-lg border border-zinc-200/80 bg-surface px-3 py-2 text-xs text-steel shadow-diffuse dark:border-zinc-700/80">
               No matching tickers found.
             </div>

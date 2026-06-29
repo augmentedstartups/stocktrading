@@ -23,7 +23,7 @@ export const upsert = mutation({
   args: {
     symbol: v.string(),
     name: v.string(),
-    market: v.union(v.literal("US"), v.literal("JSE"), v.literal("INDEX")),
+    market: v.union(v.literal("US"), v.literal("JSE"), v.literal("INDEX"), v.literal("GLOBAL")),
     sector: v.optional(v.string()),
     currency: v.string(),
     logoUrl: v.optional(v.string()),
