@@ -22,4 +22,4 @@ services/ml/data/models/*
 tests/e2e/last_run.json
 tests/e2e/*.png
 tests/e2e/*.webm
-.convex
+services/ml/.cache/

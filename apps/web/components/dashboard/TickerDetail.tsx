@@ -20,7 +20,7 @@ import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
 import { TickerCombobox } from "./TickerCombobox";
 import { WatchlistTable } from "./WatchlistTable";
 import type { Action, Horizon } from "@/lib/llm/schema";
-import { applySentimentWire, fetchFundamentals, fetchSentimentWire, getCachedFundamentals, type FundamentalsResponse } from "@/lib/ml";
+import { applySentimentWire, fetchFundamentals, fetchSentimentWire, getCachedFundamentals, hydrateSentimentWire, type FundamentalsResponse } from "@/lib/ml";
 
 const DEFAULT_LOCAL_PROVIDER_ID = "local/google/gemma-4-12b";
 
@@ -179,6 +179,14 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
     const cached = getCachedFundamentals(symbol);
     setFundamentals(cached);
     setFundamentalsLoading(!cached);
+    const hydrated = hydrateSentimentWire(symbol);
+    if (hydrated) {
+      setNews(hydrated.articles);
+      setSentiment(hydrated.sentiment);
+      setNewsLoading(false);
+    } else {
+      setNewsLoading(true);
+    }
   }, [symbol]);
 
   const loadFundamentals = useCallback(async (refresh = false) => {
@@ -212,8 +220,17 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
   }, [period, symbol]);
 
   const loadNewsWire = useCallback(async (refresh = false) => {
-    setNewsLoading(true);
-    setNewsRefreshing(true);
+    if (!refresh) {
+      const hydrated = hydrateSentimentWire(symbol);
+      if (hydrated) {
+        setNews(hydrated.articles);
+        setSentiment(hydrated.sentiment);
+        setNewsLoading(false);
+        return;
+      }
+    }
+    if (refresh) setNewsRefreshing(true);
+    else setNewsLoading(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
         await fetchSentimentWire(symbol, refresh),
@@ -354,6 +371,14 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
     const cached = getCachedFundamentals(symbol);
     setFundamentals(cached);
     setFundamentalsLoading(!cached);
+    const hydrated = hydrateSentimentWire(symbol);
+    if (hydrated) {
+      setNews(hydrated.articles);
+      setSentiment(hydrated.sentiment);
+      setNewsLoading(false);
+    } else {
+      setNewsLoading(true);
+    }
   }, [symbol]);
 
   const loadFundamentals = useCallback(async (refresh = false) => {
@@ -410,8 +435,17 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
   }, [period, symbol]);
 
   const loadNewsWire = useCallback(async (refresh = false) => {
-    setNewsLoading(true);
-    setNewsRefreshing(true);
+    if (!refresh) {
+      const hydrated = hydrateSentimentWire(symbol);
+      if (hydrated) {
+        setNews(hydrated.articles);
+        setSentiment(hydrated.sentiment);
+        setNewsLoading(false);
+        return;
+      }
+    }
+    if (refresh) setNewsRefreshing(true);
+    else setNewsLoading(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
         await fetchSentimentWire(symbol, refresh),

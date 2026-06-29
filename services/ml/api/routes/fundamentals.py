@@ -3,14 +3,17 @@ from __future__ import annotations
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from fastapi import APIRouter, HTTPException, Query
+
 import yfinance as yf
+from fastapi import APIRouter, HTTPException, Query
+
+from cache_store import read_json_cache, write_json_cache
 
 router = APIRouter()
 
 _response_cache: dict[str, tuple[dict, float]] = {}
 _symbol_info_cache: dict[str, tuple[dict, float]] = {}
-_TTL = 43200
+_TTL = 90 * 24 * 3600
 
 INFO_KEYS = [
     "shortName",
@@ -61,12 +64,18 @@ def _load_info(symbol: str) -> dict:
 def _get_symbol_info(symbol: str, refresh: bool = False) -> dict:
     key = symbol.upper()
     now = time.time()
+    if not refresh:
+        disk = read_json_cache("fundamentals_info", key, _TTL)
+        if disk is not None:
+            _symbol_info_cache[key] = (disk, now)
+            return disk
     if not refresh and key in _symbol_info_cache:
         cached, ts = _symbol_info_cache[key]
         if now - ts < _TTL:
             return cached
     info = _load_info(key)
     _symbol_info_cache[key] = (info, now)
+    write_json_cache("fundamentals_info", key, info)
     return info
 
 
@@ -110,6 +119,11 @@ def _warm_benchmarks_async() -> None:
 def get_fundamentals(symbol: str = Query(...), refresh: bool = False):
     now = time.time()
     cache_key = symbol.upper()
+    if not refresh:
+        disk = read_json_cache("fundamentals", cache_key, _TTL)
+        if disk is not None:
+            _response_cache[cache_key] = (disk, now)
+            return disk
     if not refresh and cache_key in _response_cache:
         cached_data, timestamp = _response_cache[cache_key]
         if now - timestamp < _TTL:
@@ -118,7 +132,8 @@ def get_fundamentals(symbol: str = Query(...), refresh: bool = False):
     try:
         res = _build_response(symbol, refresh)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
     _response_cache[cache_key] = (res, now)
+    write_json_cache("fundamentals", cache_key, res)
     return res

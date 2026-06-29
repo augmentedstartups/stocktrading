@@ -3,12 +3,14 @@ from __future__ import annotations
 import time
 from fastapi import APIRouter, Query
 
+from cache_store import read_json_cache, write_json_cache
 from data_sources.news import gather_news
 from sentiment.finbert import aggregate, score_headlines
 
 router = APIRouter()
 
 _sentiment_cache: dict[str, tuple[dict, float]] = {}
+_TTL = 2 * 3600
 
 
 def _src_str(v: object) -> str:
@@ -26,9 +28,14 @@ async def get_sentiment(
 ):
     now = time.time()
     cache_key = symbol.upper()
+    if not refresh:
+        disk = read_json_cache("sentiment", cache_key, _TTL)
+        if disk is not None:
+            _sentiment_cache[cache_key] = (disk, now)
+            return disk
     if not refresh and cache_key in _sentiment_cache:
         cached_data, timestamp = _sentiment_cache[cache_key]
-        if now - timestamp < 7200:
+        if now - timestamp < _TTL:
             return cached_data
 
     articles = await gather_news(symbol, name_hint=name, limit_each=10)
@@ -57,4 +64,5 @@ async def get_sentiment(
         "sources": sources,
     }
     _sentiment_cache[cache_key] = (res, now)
+    write_json_cache("sentiment", cache_key, res)
     return res

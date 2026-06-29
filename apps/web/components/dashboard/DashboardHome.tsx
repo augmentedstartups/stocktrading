@@ -19,7 +19,7 @@ import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
 import { TickerCombobox } from "./TickerCombobox";
 import { WatchlistTable } from "./WatchlistTable";
 import type { Action } from "@/lib/llm/schema";
-import { applySentimentWire, fetchFundamentals, fetchSentimentWire, getCachedFundamentals, type FundamentalsResponse } from "@/lib/ml";
+import { applySentimentWire, fetchFundamentals, fetchSentimentWire, getCachedFundamentals, hydrateSentimentWire, type FundamentalsResponse } from "@/lib/ml";
 
 type PerModelRow = {
   provider: string;
@@ -215,6 +215,14 @@ function OfflineDashboard() {
     const cached = getCachedFundamentals(symbol);
     setFundamentals(cached);
     setFundamentalsLoading(!cached);
+    const hydrated = hydrateSentimentWire(symbol);
+    if (hydrated) {
+      setNews(hydrated.articles);
+      setSentiment(hydrated.sentiment);
+      setNewsLoading(false);
+    } else {
+      setNewsLoading(true);
+    }
   }, [symbol]);
 
   const loadFundamentals = useCallback(async (refresh = false) => {
@@ -253,8 +261,17 @@ function OfflineDashboard() {
   }, [symbol]);
 
   const loadNewsWire = useCallback(async (refresh = false) => {
-    setNewsLoading(true);
-    setNewsRefreshing(true);
+    if (!refresh) {
+      const hydrated = hydrateSentimentWire(symbol);
+      if (hydrated) {
+        setNews(hydrated.articles);
+        setSentiment(hydrated.sentiment);
+        setNewsLoading(false);
+        return;
+      }
+    }
+    if (refresh) setNewsRefreshing(true);
+    else setNewsLoading(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
         await fetchSentimentWire(symbol, refresh),
@@ -443,6 +460,14 @@ function LiveDashboard() {
     const cached = getCachedFundamentals(symbol);
     setFundamentals(cached);
     setFundamentalsLoading(!cached);
+    const hydrated = hydrateSentimentWire(symbol);
+    if (hydrated) {
+      setNews(hydrated.articles);
+      setSentiment(hydrated.sentiment);
+      setNewsLoading(false);
+    } else {
+      setNewsLoading(true);
+    }
   }, [symbol]);
 
   useEffect(() => {
@@ -510,8 +535,17 @@ function LiveDashboard() {
   }, [period, symbol]);
 
   const loadNewsWire = useCallback(async (refresh = false) => {
-    setNewsLoading(true);
-    setNewsRefreshing(true);
+    if (!refresh) {
+      const hydrated = hydrateSentimentWire(symbol);
+      if (hydrated) {
+        setNews(hydrated.articles);
+        setSentiment(hydrated.sentiment);
+        setNewsLoading(false);
+        return;
+      }
+    }
+    if (refresh) setNewsRefreshing(true);
+    else setNewsLoading(true);
     try {
       const { articles, sentiment: wireSentiment } = applySentimentWire(
         await fetchSentimentWire(symbol, refresh),
