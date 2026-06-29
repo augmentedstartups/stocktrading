@@ -17,10 +17,12 @@ export function Tooltip({
   children,
   label,
   side = "top",
+  className,
 }: {
   children: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
   side?: "top" | "bottom";
+  className?: string;
 }) {
   return (
     <TooltipPrimitive.Root>
@@ -29,7 +31,8 @@ export function Tooltip({
         <TooltipPrimitive.Content
           side={side}
           className={cn(
-            "z-40 max-w-xs rounded-lg border border-zinc-200/70 bg-surface px-3 py-2 text-xs text-ink shadow-diffuse",
+            "z-40 max-w-xs rounded-lg border border-zinc-200/70 bg-surface px-3 py-2 text-xs leading-relaxed text-ink shadow-diffuse dark:border-zinc-800/80",
+            className,
           )}
         >
           {label}

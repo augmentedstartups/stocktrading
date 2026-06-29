@@ -18,6 +18,7 @@ import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
 import { TickerCombobox } from "./TickerCombobox";
 import { WatchlistTable } from "./WatchlistTable";
 import type { Action } from "@/lib/llm/schema";
+import { applySentimentWire, fetchSentimentWire } from "@/lib/ml";
 
 type PerModelRow = {
   provider: string;
@@ -192,8 +193,10 @@ function OfflineDashboard() {
   const [sentiment, setSentiment] = useState<{
     finbert: { score: number; n_articles: number };
     consensus: number;
+    llmBlended?: boolean;
   } | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
   const [railIndicators, setRailIndicators] = useState<string[]>([
     "MA50",
     "MA200",
@@ -218,18 +221,26 @@ function OfflineDashboard() {
       const ir = await fetch(`${base}/indicators?symbol=${encodedSymbol}`);
       const ij = await ir.json();
       setSeries(ij.series ?? []);
-      const sr = await fetch(`${base}/sentiment?symbol=${encodedSymbol}`);
-      const sj = await sr.json();
-      setNews(sj.articles ?? []);
-      setSentiment({
-        finbert: {
-          score: sj.aggregate?.score ?? 0,
-          n_articles: sj.aggregate?.n_articles ?? 0,
-        },
-        consensus: sj.aggregate?.score ?? 0,
-      });
+      const { articles, sentiment: wireSentiment } = applySentimentWire(
+        await fetchSentimentWire(symbol),
+      );
+      setNews(articles);
+      setSentiment(wireSentiment);
     } catch {
       setChartError("Market data service is unavailable.");
+    }
+  }, [symbol]);
+
+  const loadNewsWire = useCallback(async () => {
+    setNewsRefreshing(true);
+    try {
+      const { articles, sentiment: wireSentiment } = applySentimentWire(
+        await fetchSentimentWire(symbol),
+      );
+      setNews(articles);
+      setSentiment(wireSentiment);
+    } finally {
+      setNewsRefreshing(false);
     }
   }, [symbol]);
 
@@ -276,6 +287,7 @@ function OfflineDashboard() {
           n_articles: j.snapshot.finbert.n_articles,
         },
         consensus: j.snapshot.consensus,
+        llmBlended: j.snapshot.llm != null,
       });
     }
   };
@@ -339,9 +351,18 @@ function OfflineDashboard() {
         </section>
       <aside className="flex flex-col gap-8">
         {sentiment ? (
-          <SentimentMeter finbertScore={sentiment.finbert.score} consensus={sentiment.consensus} articles={sentiment.finbert.n_articles} />
+          <SentimentMeter
+            finbertScore={sentiment.finbert.score}
+            consensus={sentiment.consensus}
+            articles={sentiment.finbert.n_articles}
+            llmBlended={sentiment.llmBlended}
+          />
         ) : null}
-        <NewsList items={news} />
+        <NewsList
+          items={news}
+          onRefresh={() => void loadNewsWire()}
+          refreshing={newsRefreshing}
+        />
       </aside>
     </div>
   );
@@ -397,8 +418,10 @@ function LiveDashboard() {
   const [sentiment, setSentiment] = useState<{
     finbert: { score: number; n_articles: number };
     consensus: number;
+    llmBlended?: boolean;
   } | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
 
   const indicators = (settings?.indicators ?? []) as string[];
   const active = useMemo(() => new Set<string>(indicators), [indicators]);
@@ -418,20 +441,28 @@ function LiveDashboard() {
       const ir = await fetch(`${base}/indicators?symbol=${encodedSymbol}&period=${period}`);
       const ij = await ir.json();
       setSeries(ij.series ?? []);
-      const sr = await fetch(`${base}/sentiment?symbol=${encodedSymbol}`);
-      const sj = await sr.json();
-      setNews(sj.articles ?? []);
-      setSentiment({
-        finbert: {
-          score: sj.aggregate?.score ?? 0,
-          n_articles: sj.aggregate?.n_articles ?? 0,
-        },
-        consensus: sj.aggregate?.score ?? 0,
-      });
+      const { articles, sentiment: wireSentiment } = applySentimentWire(
+        await fetchSentimentWire(symbol),
+      );
+      setNews(articles);
+      setSentiment(wireSentiment);
     } catch {
       setChartError("Market data service is unavailable.");
     }
   }, [period, symbol]);
+
+  const loadNewsWire = useCallback(async () => {
+    setNewsRefreshing(true);
+    try {
+      const { articles, sentiment: wireSentiment } = applySentimentWire(
+        await fetchSentimentWire(symbol),
+      );
+      setNews(articles);
+      setSentiment(wireSentiment);
+    } finally {
+      setNewsRefreshing(false);
+    }
+  }, [symbol]);
 
   useEffect(() => {
     void loadChart();
@@ -491,6 +522,7 @@ function LiveDashboard() {
           n_articles: j.snapshot.finbert.n_articles,
         },
         consensus: j.snapshot.consensus,
+        llmBlended: j.snapshot.llm != null,
       });
     }
   };
@@ -605,9 +637,14 @@ function LiveDashboard() {
               finbertScore={sentiment.finbert.score}
               consensus={sentiment.consensus}
               articles={sentiment.finbert.n_articles}
+              llmBlended={sentiment.llmBlended}
             />
           ) : null}
-          <NewsList items={news} />
+          <NewsList
+            items={news}
+            onRefresh={() => void loadNewsWire()}
+            refreshing={newsRefreshing}
+          />
         </aside>
       </div>
       <Sheet open={watchlistOpen} onOpenChange={setWatchlistOpen} title="Watchlist">

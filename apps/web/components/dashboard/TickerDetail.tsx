@@ -19,6 +19,7 @@ import { TickerChart, type Candle, type IndSeries } from "./TickerChart";
 import { TickerCombobox } from "./TickerCombobox";
 import { WatchlistTable } from "./WatchlistTable";
 import type { Action, Horizon } from "@/lib/llm/schema";
+import { applySentimentWire, fetchSentimentWire } from "@/lib/ml";
 
 const DEFAULT_LOCAL_PROVIDER_ID = "local/google/gemma-4-12b";
 
@@ -165,7 +166,9 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
   const [sentiment, setSentiment] = useState<{
     finbert: { score: number; n_articles: number };
     consensus: number;
+    llmBlended?: boolean;
   } | null>(null);
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
   const active = useMemo(() => new Set(["MA50", "MA200", "Volume", "RSI"]), []);
 
   const loadChart = useCallback(async () => {
@@ -177,14 +180,25 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
     const ir = await fetch(`${base}/indicators?symbol=${encoded}&period=${period}`);
     const ij = await ir.json();
     setSeries(ij.series ?? []);
-    const sr = await fetch(`${base}/sentiment?symbol=${encoded}`);
-    const sj = await sr.json();
-    setNews(sj.articles ?? []);
-    setSentiment({
-      finbert: { score: sj.aggregate?.score ?? 0, n_articles: sj.aggregate?.n_articles ?? 0 },
-      consensus: sj.aggregate?.score ?? 0,
-    });
+    const { articles, sentiment: wireSentiment } = applySentimentWire(
+      await fetchSentimentWire(symbol),
+    );
+    setNews(articles);
+    setSentiment(wireSentiment);
   }, [period, symbol]);
+
+  const loadNewsWire = useCallback(async () => {
+    setNewsRefreshing(true);
+    try {
+      const { articles, sentiment: wireSentiment } = applySentimentWire(
+        await fetchSentimentWire(symbol),
+      );
+      setNews(articles);
+      setSentiment(wireSentiment);
+    } finally {
+      setNewsRefreshing(false);
+    }
+  }, [symbol]);
 
   useEffect(() => {
     void loadChart();
@@ -234,6 +248,7 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
               n_articles: j.snapshot.finbert.n_articles,
             },
             consensus: j.snapshot.consensus,
+            llmBlended: j.snapshot.llm != null,
           });
         }
       }}
@@ -249,6 +264,8 @@ function TickerDetailOffline({ symbol }: { symbol: string }) {
       inputsUsed={null}
       sentiment={sentiment}
       news={news}
+      onRefreshNews={() => void loadNewsWire()}
+      newsRefreshing={newsRefreshing}
       watchlistSheet={null}
     />
   );
@@ -287,8 +304,10 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
   const [sentiment, setSentiment] = useState<{
     finbert: { score: number; n_articles: number };
     consensus: number;
+    llmBlended?: boolean;
   } | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
+  const [newsRefreshing, setNewsRefreshing] = useState(false);
 
   useEffect(() => {
     setLocalDecision(null);
@@ -324,20 +343,28 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
       const ir = await fetch(`${base}/indicators?symbol=${encoded}&period=${period}`);
       const ij = await ir.json();
       setSeries(ij.series ?? []);
-      const sr = await fetch(`${base}/sentiment?symbol=${encoded}`);
-      const sj = await sr.json();
-      setNews(sj.articles ?? []);
-      setSentiment({
-        finbert: {
-          score: sj.aggregate?.score ?? 0,
-          n_articles: sj.aggregate?.n_articles ?? 0,
-        },
-        consensus: sj.aggregate?.score ?? 0,
-      });
+      const { articles, sentiment: wireSentiment } = applySentimentWire(
+        await fetchSentimentWire(symbol),
+      );
+      setNews(articles);
+      setSentiment(wireSentiment);
     } catch {
       setChartError("Market data service is unavailable.");
     }
   }, [period, symbol]);
+
+  const loadNewsWire = useCallback(async () => {
+    setNewsRefreshing(true);
+    try {
+      const { articles, sentiment: wireSentiment } = applySentimentWire(
+        await fetchSentimentWire(symbol),
+      );
+      setNews(articles);
+      setSentiment(wireSentiment);
+    } finally {
+      setNewsRefreshing(false);
+    }
+  }, [symbol]);
 
   useEffect(() => {
     void loadChart();
@@ -389,6 +416,7 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
           n_articles: j.snapshot.finbert.n_articles,
         },
         consensus: j.snapshot.consensus,
+        llmBlended: j.snapshot.llm != null,
       });
     }
   };
@@ -458,6 +486,8 @@ function TickerDetailLive({ symbol }: { symbol: string }) {
       inputsUsed={decisionInputsUsed}
       sentiment={sentiment}
       news={news}
+      onRefreshNews={() => void loadNewsWire()}
+      newsRefreshing={newsRefreshing}
       watchlistSheet={watchlistSheet}
     />
   );
@@ -491,6 +521,8 @@ function TickerDetailLayout({
   inputsUsed,
   sentiment,
   news,
+  onRefreshNews,
+  newsRefreshing = false,
   watchlistSheet,
 }: {
   symbol: string;
@@ -521,8 +553,11 @@ function TickerDetailLayout({
   sentiment: {
     finbert: { score: number; n_articles: number };
     consensus: number;
+    llmBlended?: boolean;
   } | null;
   news: Array<{ title: string; url: string; source: string; finbertScore: number }>;
+  onRefreshNews?: () => void;
+  newsRefreshing?: boolean;
   watchlistSheet: ReactNode;
 }) {
   return (
@@ -617,9 +652,14 @@ function TickerDetailLayout({
               finbertScore={sentiment.finbert.score}
               consensus={sentiment.consensus}
               articles={sentiment.finbert.n_articles}
+              llmBlended={sentiment.llmBlended}
             />
           ) : null}
-          <NewsList items={news} />
+          <NewsList
+            items={news}
+            onRefresh={onRefreshNews}
+            refreshing={newsRefreshing}
+          />
         </aside>
       </div>
       {watchlistSheet}

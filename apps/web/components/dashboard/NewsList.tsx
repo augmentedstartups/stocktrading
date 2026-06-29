@@ -1,16 +1,54 @@
 "use client";
 
+import { ArrowClockwise } from "@phosphor-icons/react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+
+export type NewsWireItem = {
+  title: string;
+  url: string;
+  source: string;
+  finbertScore: number;
+  publishedAt?: number;
+};
+
+function formatNewsDate(ts: number): string {
+  const ms = ts > 1e12 ? ts : ts * 1000;
+  return new Date(ms).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 export function NewsList({
   items,
+  onRefresh,
+  refreshing = false,
 }: {
-  items: Array<{ title: string; url: string; source: string; finbertScore: number }>;
+  items: NewsWireItem[];
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   return (
     <div className="rounded-bento border border-zinc-200/70 bg-surface shadow-diffuse dark:border-zinc-800/80">
-      <div className="border-b border-zinc-200/60 px-6 py-4 dark:border-zinc-800/80">
+      <div className="flex items-center gap-2 border-b border-zinc-200/60 px-6 py-4 dark:border-zinc-800/80">
         <p className="font-display text-lg tracking-tight text-ink">News wire</p>
+        {onRefresh ? (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Refresh news wire"
+            title="Refresh news wire"
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200/70 text-zinc-500 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:opacity-50 dark:border-zinc-700/80 dark:text-zinc-400 dark:hover:text-emerald-400",
+              refreshing && "pointer-events-none",
+            )}
+          >
+            <ArrowClockwise size={18} className={cn(refreshing && "animate-spin")} />
+          </button>
+        ) : null}
       </div>
       <ul className="divide-y divide-zinc-200/60 dark:divide-zinc-800/80">
         {items.slice(0, 8).map((n, i) => (
@@ -38,6 +76,11 @@ export function NewsList({
               <span className="font-mono text-[11px] uppercase tracking-widest text-steel">
                 {n.source}
               </span>
+              {n.publishedAt ? (
+                <span className="font-mono text-[11px] uppercase tracking-widest text-steel">
+                  {formatNewsDate(n.publishedAt)}
+                </span>
+              ) : null}
               <span className="number text-xs text-zinc-500">
                 FinBERT {n.finbertScore.toFixed(2)}
               </span>
