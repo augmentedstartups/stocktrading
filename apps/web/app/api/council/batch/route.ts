@@ -1,6 +1,5 @@
 import { aggregateCouncil } from "@/lib/llm/aggregator";
 import { COUNCIL_MODELS, DEFAULT_COUNCIL_PROVIDER_ID, runCouncil } from "@/lib/llm/council";
-import { enrichCouncilResults } from "@/lib/llm/enrichReasons";
 import { headlinesFromArticles } from "@/lib/llm/prompts";
 import type { Action } from "@/lib/llm/schema";
 import { mergeSentiment } from "@/lib/llm/sentiment";
@@ -105,15 +104,12 @@ async function runOne(
       rl,
     };
 
-    const results = enrichCouncilResults(
-      await runCouncil({
-        symbol,
-        ...reasonCtx,
-        userHorizon,
-        activeProviders,
-      }),
-      reasonCtx,
-    );
+    const results = await runCouncil({
+      symbol,
+      ...reasonCtx,
+      userHorizon,
+      activeProviders,
+    });
 
     const decision = aggregateCouncil({ symbol, results, rl, userHorizon });
     const inputsUsed = {

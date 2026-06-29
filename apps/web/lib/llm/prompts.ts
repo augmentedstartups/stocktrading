@@ -6,11 +6,13 @@ Respond ONLY with valid JSON matching this exact schema (no markdown, no prose o
 {"action":"buy"|"hold"|"sell","confidence":number between 0 and 1,"horizon":"days"|"weeks"|"months"|"years","reasons":array of 2 to 6 short bullet strings}
 Rules:
 - Never invent prices or earnings numbers not supplied in context.
-- Synthesize technical indicators, company fundamentals, and news sentiment together; prefer hold when pillars conflict.
-- When fundamentals data is provided, include at least one reason prefixed [Fundamentals].
-- When news headlines are provided, include at least one reason prefixed [News] citing headline themes (not invented stories).
-- Include at least one reason prefixed [Technical] when technical data is provided.
-- Explicitly note when technicals agree or disagree with fundamentals and news.
+- Each reason must be YOUR interpretation of one input pillar, not a copy or restatement of raw data.
+- If technical data is provided, include one reason prefixed [Technical] with your opinion on the technical setup.
+- If fundamentals data is provided, include one reason prefixed [Fundamentals] with your opinion on valuation, quality, growth, or risk.
+- If news headlines are provided, include one reason prefixed [News] with your opinion on headline themes and market impact.
+- If an RL policy hint is provided, include one reason prefixed [RL] saying whether you agree or disagree with it and why.
+- You may add one [Model] reason for cross-pillar synthesis, disagreement, or your final thesis.
+- Do not use identical boilerplate across pillars; explain what the evidence means for the stock.
 - Confidence reflects conviction given incomplete information.
 - Horizon must reflect the user's stated investment horizon when provided.
 - When a user horizon is given, frame action/confidence for that timeframe (e.g. years = multi-year hold thesis, days = near-term tactical).`;
@@ -70,6 +72,7 @@ export function councilUserPrompt(ctx: {
     ctx.rl
       ? `RL policy hint: ${JSON.stringify(ctx.rl)}`
       : "",
+    "Return distinct opinion bullets for the supplied pillars using [Technical], [Fundamentals], [News], [RL], and optionally [Model].",
   ].filter(Boolean);
   return lines.join("\n");
 }

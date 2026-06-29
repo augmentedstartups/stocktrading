@@ -19,7 +19,6 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { CouncilModelPicker } from "./CouncilModelPicker";
 import { HorizonPicker } from "./HorizonPicker";
-import { ReasonsList } from "./ReasonsList";
 
 type PerModelEntry = {
   provider: string;
@@ -66,8 +65,10 @@ function ReasonsDisplay({
   perModel?: PerModelEntry[];
   reasons: string[];
 }) {
-  type ReasonRow = { model: string; provider: string; text: string };
-  const byModel: Map<string, ReasonRow[]> = new Map();
+  type ReasonRow = { tag: string | null; body: string };
+  type ModelSection = { model: string; provider: string; rows: ReasonRow[] };
+
+  const sections: ModelSection[] = [];
 
   if (perModel && perModel.length > 0) {
     for (const m of perModel) {
@@ -78,74 +79,78 @@ function ReasonsDisplay({
           : m.reason
             ? [m.reason]
             : [];
+
       const rows: ReasonRow[] = [];
       for (const text of bullets) {
-        if (text.trim()) rows.push({ model: m.model, provider: m.provider, text });
+        const { tag, body } = parsePillar(text.trim());
+        if (!text.trim()) continue;
+        rows.push({ tag, body: body || text });
       }
-      if (rows.length > 0) byModel.set(m.model, rows);
+
+      if (rows.length > 0) sections.push({ model: m.model, provider: m.provider, rows });
     }
   }
 
-  if (byModel.size === 0 && reasons.length > 0) {
-    const fallback: ReasonRow[] = [];
+  if (sections.length === 0 && reasons.length > 0) {
+    const fallback = new Map<string, ModelSection>();
     for (const r of reasons) {
       const idx = r.indexOf(": ");
-      if (idx > 0) {
-        fallback.push({ model: r.slice(0, idx), provider: "council", text: r.slice(idx + 2) });
-      } else {
-        fallback.push({ model: "council", provider: "council", text: r });
+      const text = idx > 0 ? r.slice(idx + 2) : r;
+      const model = idx > 0 ? r.slice(0, idx) : "council";
+      const { tag, body } = parsePillar(text);
+      const section = fallback.get(model) ?? { model, provider: "council", rows: [] };
+      section.rows.push({ tag, body: body || text });
+      fallback.set(model, section);
+    }
+    for (const section of fallback.values()) {
+      if (section.rows.length > 0) {
+        sections.push(section);
       }
     }
-    byModel.set("council", fallback);
   }
 
-  if (byModel.size === 0) {
+  if (sections.length === 0) {
     return <p className="text-sm text-steel">No reasons recorded.</p>;
   }
 
-  const multiModel = byModel.size > 1;
-
   return (
-    <div className="space-y-4">
-      {Array.from(byModel.entries()).map(([modelName, rows]) => {
-        const provider = rows[0]?.provider ?? "council";
-        return (
-          <div key={modelName}>
-            {multiModel && (
-              <div className="mb-2 flex items-center gap-2">
+    <div className="space-y-5">
+      {sections.map((section) => (
+        <div key={`${section.provider}/${section.model}`}>
+          <div className="mb-2 flex items-center gap-2">
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 font-mono text-[10px] leading-none tracking-wide",
+                pillColor(section.provider),
+              )}
+            >
+              {section.model}
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-steel">
+              {section.provider}
+            </span>
+          </div>
+          <ul className="ml-1 space-y-2.5 border-l border-zinc-200/60 pl-1 dark:border-zinc-800/60">
+            {section.rows.map((row, i) => (
+              <li key={i} className="flex items-start gap-3 pl-3">
                 <span
                   className={cn(
-                    "rounded-full border px-2.5 py-0.5 font-mono text-[10px] leading-none tracking-wide",
-                    pillColor(provider),
+                    "mt-0.5 shrink-0 rounded-full border px-2.5 py-1 font-mono text-[10px] leading-none tracking-wide",
+                    row.tag
+                      ? (PILLAR_COLORS[row.tag] ?? PILLAR_COLORS["[Model]"])
+                      : PILLAR_COLORS["[Model]"],
                   )}
                 >
-                  {modelName}
+                  {row.tag ?? "[Model]"}
                 </span>
-                <span className="text-[10px] uppercase tracking-widest text-steel">{provider}</span>
-              </div>
-            )}
-            <ul className={cn("space-y-2.5", multiModel && "pl-1 border-l border-zinc-200/60 dark:border-zinc-800/60 ml-1")}>
-              {rows.map((row, i) => {
-                const { tag, body } = parsePillar(row.text);
-                const tagClass = tag ? (PILLAR_COLORS[tag] ?? PILLAR_COLORS["[Model]"]) : pillColor(row.provider);
-                return (
-                  <li key={i} className="flex items-start gap-3 pl-3">
-                    <span
-                      className={cn(
-                        "mt-0.5 shrink-0 rounded-full border px-2.5 py-1 font-mono text-[10px] leading-none tracking-wide",
-                        tagClass,
-                      )}
-                    >
-                      {tag ?? (multiModel ? tag : modelName)}
-                    </span>
-                    <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{body}</p>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        );
-      })}
+                <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+                  {row.body}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }
