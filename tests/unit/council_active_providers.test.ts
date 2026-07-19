@@ -13,6 +13,7 @@ describe("council activeProviders reconciliation", () => {
     expect(registry).toContain("google/gemini-3.1-pro-preview");
     expect(registry).toContain("google/gemini-3.5-flash");
     expect(registry).toContain("moonshot/kimi-k2.7-code");
+    expect(registry).toContain("moonshot/kimi-k3");
     expect(registry).toContain("zai/glm-5.2");
     expect(registry).toContain("minimax/MiniMax-M3");
     expect(registry).not.toContain("openai/gpt-5.5");

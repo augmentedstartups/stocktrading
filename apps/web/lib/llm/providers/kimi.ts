@@ -17,3 +17,11 @@ export async function askKimi(
     user,
   });
 }
+
+export async function askKimiK3(
+  system: string,
+  user: string,
+): Promise<ProviderResult> {
+  const model = process.env.MOONSHOT_K3_MODEL ?? "kimi-k3";
+  return askKimi(system, user, model);
+}

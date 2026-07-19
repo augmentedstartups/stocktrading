@@ -34,6 +34,7 @@ export const bootstrap = mutation({
           "google/gemini-3.1-pro-preview",
           "google/gemini-3.5-flash",
           "moonshot/kimi-k2.7-code",
+          "moonshot/kimi-k3",
           "zai/glm-5.2",
           "minimax/MiniMax-M3",
         ],

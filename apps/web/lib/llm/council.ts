@@ -6,7 +6,7 @@ import {
 import { askAnthropic, askAnthropicSonnet } from "./providers/anthropic";
 import { askGemini, askGemini35Flash } from "./providers/gemini";
 import { askGLM } from "./providers/glm";
-import { askKimi } from "./providers/kimi";
+import { askKimi, askKimiK3 } from "./providers/kimi";
 import { askLocal } from "./providers/local";
 import { askMiniMax } from "./providers/minimax";
 import type { ProviderResult } from "./providers/types";
@@ -61,6 +61,12 @@ export const COUNCIL_MODELS: CouncilModel[] = [
     provider: "moonshot",
     label: "Kimi K2.7 Code",
     run: (s, u) => askKimi(s, u),
+  },
+  {
+    id: `moonshot/${process.env.MOONSHOT_K3_MODEL ?? "kimi-k3"}`,
+    provider: "moonshot",
+    label: "Kimi K3",
+    run: (s, u) => askKimiK3(s, u),
   },
   {
     id: `zai/${process.env.ZAI_MODEL ?? "glm-5.2"}`,
