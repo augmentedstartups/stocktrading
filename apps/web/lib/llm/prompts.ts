@@ -72,7 +72,21 @@ export function councilUserPrompt(ctx: {
     ctx.rl
       ? `RL policy hint: ${JSON.stringify(ctx.rl)}`
       : "",
-    "Return distinct opinion bullets for the supplied pillars using [Technical], [Fundamentals], [News], [RL], and optionally [Model].",
+    `Return distinct opinion bullets for the supplied pillars using ${pillarTags(ctx)}, and optionally [Model].`,
   ].filter(Boolean);
   return lines.join("\n");
+}
+
+function pillarTags(ctx: {
+  indicators: Record<string, unknown>;
+  fundamentals?: Record<string, unknown>;
+  headlines?: CouncilHeadline[];
+  rl?: { action: string; confidence: number };
+}): string {
+  const tags: string[] = [];
+  if (ctx.indicators && Object.keys(ctx.indicators).length > 0) tags.push("[Technical]");
+  if (ctx.fundamentals && Object.keys(ctx.fundamentals).length > 0) tags.push("[Fundamentals]");
+  if (ctx.headlines && ctx.headlines.length > 0) tags.push("[News]");
+  if (ctx.rl) tags.push("[RL]");
+  return tags.join(", ") || "[Model]";
 }

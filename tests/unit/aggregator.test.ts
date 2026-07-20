@@ -58,6 +58,25 @@ describe("aggregateCouncil", () => {
     expect(["sell", "hold"]).toContain(d.action);
   });
 
+  it("excludes RL influence when untrained (rl omitted)", () => {
+    const results: ProviderResult[] = [
+      {
+        provider: "a",
+        model: "m1",
+        ok: true,
+        latencyMs: 10,
+        verdict: {
+          action: "hold",
+          confidence: 0.5,
+          horizon: "months",
+          reasons: ["neutral"],
+        },
+      },
+    ];
+    const d = aggregateCouncil({ symbol: "TEST", results });
+    expect(d.action).toBe("hold");
+  });
+
   it("keeps a clear model majority over the RL hint", () => {
     const results: ProviderResult[] = ["a", "b", "c", "d"].map((provider, idx) => ({
       provider,

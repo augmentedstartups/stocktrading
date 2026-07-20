@@ -1,31 +1,59 @@
 from __future__ import annotations
 
+import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
+from rl.paths import (
+    MODELS_DIR,
+    DEFAULT_HORIZON,
+    interval_for,
+    meta_path,
+    model_path,
+    normalize_horizon,
+    periods_for,
+)
 
-MODELS_DIR = Path(os.environ.get("MODELS_DIR", "./data/models"))
+# Re-export inference helpers for backward-compatible imports.
+from rl.infer import predict, rollout  # noqa: F401
 
 
-def train_ppo(symbol: str, total_timesteps: int = 50_000) -> Path:
+def _n_envs() -> int:
+    cpu = os.cpu_count() or 4
+    return max(1, min(int(os.environ.get("RL_N_ENVS", "8")), cpu))
+
+
+def train_ppo(symbol: str, horizon: str = DEFAULT_HORIZON, total_timesteps: int = 50_000) -> Path:
     from stable_baselines3 import PPO
-    from stable_baselines3.common.vec_env import DummyVecEnv
+    from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
     from pipeline.ingest import ensure_fresh
     from rl.env import TradingEnv
 
-    df = ensure_fresh(symbol, period="10y")
+    horizon = normalize_horizon(horizon)
+    train_period, _ = periods_for(horizon)
+    df = ensure_fresh(symbol, period=train_period, interval=interval_for(horizon))
 
     def make_env():
         return TradingEnv(df)
 
-    venv = DummyVecEnv([make_env])
+    n_envs = _n_envs()
+    try:
+        venv = (
+            SubprocVecEnv([make_env for _ in range(n_envs)])
+            if n_envs > 1
+            else DummyVecEnv([make_env])
+        )
+    except Exception:
+        n_envs = 1
+        venv = DummyVecEnv([make_env])
+
     device = "cuda" if os.environ.get("FORCE_CUDA") == "1" else "cpu"
     model = PPO(
         "MlpPolicy",
         venv,
-        n_steps=512,
+        n_steps=max(512 // n_envs, 128),
         batch_size=64,
         learning_rate=3e-4,
         verbose=0,
@@ -33,40 +61,39 @@ def train_ppo(symbol: str, total_timesteps: int = 50_000) -> Path:
     )
     model.learn(total_timesteps=total_timesteps)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    out = MODELS_DIR / f"ppo_{symbol.replace('.', '_').replace('^', 'I_')}.zip"
+    out = model_path(symbol, horizon)
     model.save(str(out))
+    meta_path(symbol, horizon).write_text(
+        json.dumps(
+            {
+                "symbol": symbol,
+                "horizon": horizon,
+                "trained_at": datetime.now(timezone.utc).isoformat(),
+                "timesteps": total_timesteps,
+                "n_envs": n_envs,
+            }
+        )
+    )
+    try:
+        venv.close()
+    except Exception:
+        pass
     return out
 
 
-def predict(symbol: str) -> dict:
-    from pipeline.features import FEATURE_COLS, build_features
-    from pipeline.ingest import ensure_fresh
-
-    df = ensure_fresh(symbol, period="2y")
-    feats = build_features(df)
-    if len(feats) == 0:
-        return {"action": "hold", "confidence": 0.0, "reason": "no features"}
-    last = feats.iloc[-1]
-    obs = np.array([float(last[c]) for c in FEATURE_COLS] + [0.0], dtype=np.float32)
-
-    model_path = MODELS_DIR / f"ppo_{symbol.replace('.', '_').replace('^', 'I_')}.zip"
-    if not model_path.exists():
-        rsi_n = float(last["rsi_n"])
-        macd_h = float(last["macd_hist_n"])
-        ma_diff = float(last["ma_ratio_50_200"])
-        score = -rsi_n + 50 * macd_h + 10 * ma_diff
-        if score > 0.3:
-            return {"action": "buy", "confidence": min(0.6, abs(score)), "reason": "heuristic_no_model"}
-        if score < -0.3:
-            return {"action": "sell", "confidence": min(0.6, abs(score)), "reason": "heuristic_no_model"}
-        return {"action": "hold", "confidence": 0.5, "reason": "heuristic_no_model"}
-
-    try:
-        from stable_baselines3 import PPO
-    except Exception:
-        return {"action": "hold", "confidence": 0.0, "reason": "sb3_not_installed"}
-    model = PPO.load(str(model_path))
-    a, _ = model.predict(obs, deterministic=True)
-    action = int(a)
-    label = ["hold", "buy", "sell"][action]
-    return {"action": label, "confidence": 0.7, "reason": "ppo_model"}
+def train_batch(
+    symbols: list[str],
+    horizons: list[str] | None = None,
+    total_timesteps: int = 30_000,
+) -> list[dict]:
+    horizons = horizons or [DEFAULT_HORIZON]
+    results: list[dict] = []
+    for symbol in symbols:
+        for horizon in horizons:
+            h = normalize_horizon(horizon)
+            try:
+                path = train_ppo(symbol, horizon=h, total_timesteps=total_timesteps)
+                results.append({"symbol": symbol, "horizon": h, "model_path": str(path)})
+            except Exception as e:
+                results.append({"symbol": symbol, "horizon": h, "error": str(e)})
+    return results

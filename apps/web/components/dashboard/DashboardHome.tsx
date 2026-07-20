@@ -12,6 +12,7 @@ import { BootstrapClient } from "./BootstrapClient";
 import { CouncilModelPicker } from "./CouncilModelPicker";
 import { DecisionCard } from "./DecisionCard";
 import { IndicatorRail } from "./IndicatorRail";
+import { RlPanel } from "./RlPanel";
 import { NewsList } from "./NewsList";
 import { FundamentalAnalysis } from "./FundamentalAnalysis";
 import { SentimentMeter } from "./SentimentMeter";
@@ -375,7 +376,7 @@ function OfflineDashboard() {
           </div>
         ) : null}
         <div className="rounded-bento border border-zinc-200/60 bg-surface/40 p-2 shadow-diffuse dark:border-zinc-800/70">
-          <TickerChart candles={candles} series={series} active={active} />
+          <TickerChart candles={candles} series={series} active={active} symbol={symbol} />
         </div>
         <IndicatorRail
           indicators={railIndicators}
@@ -383,6 +384,7 @@ function OfflineDashboard() {
             setRailIndicators(next);
           }}
         />
+        <RlPanel symbol={symbol} />
         {decision ? (
           <DecisionCard
             symbol={symbol}
@@ -707,7 +709,7 @@ function LiveDashboard() {
           </div>
 
           <div className="rounded-bento border border-zinc-200/60 bg-surface/40 p-2 shadow-diffuse dark:border-zinc-800/70">
-            <TickerChart candles={candles} series={series} active={active} />
+            <TickerChart candles={candles} series={series} active={active} symbol={symbol} />
           </div>
           <IndicatorRail
             indicators={indicators}
@@ -717,6 +719,8 @@ function LiveDashboard() {
               void setIndicatorsMut({ userId: uid, indicators: next });
             }}
           />
+
+          <RlPanel symbol={symbol} />
 
           {decision ? (
             <DecisionCard

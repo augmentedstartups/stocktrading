@@ -87,12 +87,15 @@ async function runOne(
         )
       : null;
 
-    const rlRaw = await mlGet<{ action: string; confidence: number }>(
-      `/rl/predict?symbol=${encodeURIComponent(symbol)}`,
-    ).catch(() => null);
+    const rlRaw = await mlGet<{
+      action: string;
+      confidence: number;
+      trained?: boolean;
+      reason?: string;
+    }>(`/rl/predict?symbol=${encodeURIComponent(symbol)}`).catch(() => null);
 
     const rl =
-      rlRaw && ["buy", "hold", "sell"].includes(rlRaw.action)
+      rlRaw && rlRaw.trained === true && ["buy", "hold", "sell"].includes(rlRaw.action)
         ? { action: rlRaw.action as Action, confidence: rlRaw.confidence }
         : undefined;
 

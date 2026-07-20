@@ -33,7 +33,7 @@ export const bootstrap = mutation({
           "anthropic/claude-sonnet-4-6",
           "google/gemini-3.1-pro-preview",
           "google/gemini-3.5-flash",
-          "moonshot/kimi-k2.7-code",
+          "moonshot/kimi-k3",
           "zai/glm-5.2",
           "minimax/MiniMax-M3",
         ],

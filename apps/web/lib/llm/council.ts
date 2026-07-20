@@ -57,9 +57,9 @@ export const COUNCIL_MODELS: CouncilModel[] = [
     run: (s, u) => askGemini35Flash(s, u),
   },
   {
-    id: `moonshot/${process.env.MOONSHOT_MODEL ?? "kimi-k2.7-code"}`,
+    id: `moonshot/${process.env.MOONSHOT_MODEL ?? "kimi-k3"}`,
     provider: "moonshot",
-    label: "Kimi K2.7 Code",
+    label: "Kimi K3",
     run: (s, u) => askKimi(s, u),
   },
   {

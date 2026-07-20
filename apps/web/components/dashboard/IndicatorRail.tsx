@@ -20,6 +20,7 @@ import {
 import { useReducedMotion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
+import { RL_HORIZONS } from "@/lib/rlHorizons";
 import { cn } from "@/lib/utils";
 
 const DEFS: Array<{
@@ -27,6 +28,7 @@ const DEFS: Array<{
   label: string;
   hint: string;
   Icon: typeof TrendUp;
+  tint?: string;
   disabled?: boolean;
 }> = [
   { id: "MA20", label: "MA 20", hint: "20-day moving average", Icon: TrendUp },
@@ -42,7 +44,13 @@ const DEFS: Array<{
   { id: "Volume", label: "Volume", hint: "Volume histogram", Icon: ChartBar },
   { id: "News", label: "News", hint: "News markers on timeline", Icon: Newspaper },
   { id: "Sentiment", label: "Sentiment", hint: "Sentiment ribbon", Icon: Sparkle },
-  { id: "RL", label: "RL", hint: "Reinforcement-learning markers", Icon: Robot },
+  ...RL_HORIZONS.map((h) => ({
+    id: h.id,
+    label: h.label,
+    hint: h.hint,
+    Icon: Robot,
+    tint: h.color,
+  })),
   { id: "Council", label: "Council", hint: "Council verdict markers", Icon: UsersThree },
 ];
 
@@ -99,11 +107,14 @@ export function IndicatorRail({
                 aria-pressed={on}
                 data-testid={`indicator-rail-${d.id}`}
                 onClick={() => void toggle(d.id)}
+                style={on && d.tint ? { borderColor: d.tint, color: d.tint } : undefined}
                 className={cn(
                   "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-zinc-600 transition-colors active:scale-[0.96] active:translate-y-px",
-                  on
+                  on && !d.tint
                     ? "border-emerald-500/40 bg-emerald-50 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] dark:bg-emerald-950/30 dark:text-emerald-200"
-                    : "border-zinc-200/70 bg-white/50 dark:border-zinc-700/70 dark:bg-zinc-900/40 dark:text-zinc-300",
+                    : on && d.tint
+                      ? "bg-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] dark:bg-zinc-900/50"
+                      : "border-zinc-200/70 bg-white/50 dark:border-zinc-700/70 dark:bg-zinc-900/40 dark:text-zinc-300",
                   disabled && "cursor-not-allowed opacity-40",
                 )}
               >

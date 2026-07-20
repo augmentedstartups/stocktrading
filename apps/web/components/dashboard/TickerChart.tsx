@@ -7,10 +7,19 @@ import {
   HistogramSeries,
   LineSeries,
   createChart,
+  createSeriesMarkers,
 } from "lightweight-charts";
 import { useTheme } from "next-themes";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { RL_HORIZONS } from "@/lib/rlHorizons";
 import { cn } from "@/lib/utils";
+
+type RlChartMarker = {
+  t: number;
+  action: "buy" | "sell";
+  color: string;
+  label: string;
+};
 
 export type Candle = {
   t: number;
@@ -41,15 +50,54 @@ export function TickerChart({
   candles,
   series,
   active,
+  symbol,
   className,
 }: {
   candles: Candle[];
   series: IndSeries[];
   active: Set<string>;
+  symbol?: string;
   className?: string;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
+  const [rlMarkers, setRlMarkers] = useState<RlChartMarker[]>([]);
+
+  const activeHorizons = useMemo(
+    () => RL_HORIZONS.filter((h) => active.has(h.id)),
+    [active],
+  );
+  const activeHorizonKey = activeHorizons.map((h) => h.id).join(",");
+
+  useEffect(() => {
+    if (activeHorizons.length === 0 || !symbol) {
+      setRlMarkers([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      activeHorizons.map((h) =>
+        fetch(`/api/rl/rollout?symbol=${encodeURIComponent(symbol)}&horizon=${h.horizon}`)
+          .then((r) => r.json())
+          .then((d) =>
+            (Array.isArray(d?.markers) ? d.markers : []).map(
+              (m: { t: number; action: "buy" | "sell" }) => ({
+                t: m.t,
+                action: m.action,
+                color: h.color,
+                label: h.label,
+              }),
+            ),
+          )
+          .catch(() => [] as RlChartMarker[]),
+      ),
+    ).then((groups) => {
+      if (!cancelled) setRlMarkers(groups.flat());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeHorizonKey, symbol]);
 
   const palette = useMemo(() => {
     const dark = resolvedTheme === "dark";
@@ -179,6 +227,20 @@ export function TickerChart({
       );
     }
 
+    if (rlMarkers.length > 0) {
+      const markers = rlMarkers
+        .slice()
+        .sort((a, b) => a.t - b.t)
+        .map((m) => ({
+          time: m.t as never,
+          position: m.action === "buy" ? ("belowBar" as const) : ("aboveBar" as const),
+          color: m.color,
+          shape: m.action === "buy" ? ("arrowUp" as const) : ("arrowDown" as const),
+          text: `${m.label} ${m.action === "buy" ? "Buy" : "Sell"}`,
+        }));
+      createSeriesMarkers(cs, markers);
+    }
+
     c.timeScale().fitContent();
 
     const ro = new ResizeObserver(() => {
@@ -190,7 +252,7 @@ export function TickerChart({
       ro.disconnect();
       c.remove();
     };
-  }, [active, candles, palette, series]);
+  }, [active, candles, palette, series, rlMarkers]);
 
   return (
     <div

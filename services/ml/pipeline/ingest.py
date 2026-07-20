@@ -11,9 +11,14 @@ import yfinance as yf
 PARQUET_DIR = Path(os.environ.get("PARQUET_DIR", "./data/parquet"))
 
 
-def _path(symbol: str) -> Path:
+def _path(symbol: str, interval: str = "1d") -> Path:
     safe = symbol.replace("/", "_").replace("^", "I_")
-    return PARQUET_DIR / f"{safe}.parquet"
+    suffix = "" if interval == "1d" else f"_{interval}"
+    return PARQUET_DIR / f"{safe}{suffix}.parquet"
+
+
+def _staleness_days(interval: str) -> int:
+    return {"1d": 2, "1wk": 8, "1mo": 35}.get(interval, 2)
 
 
 def fetch(symbol: str, period: str = "10y", interval: str = "1d") -> pd.DataFrame:
@@ -36,15 +41,15 @@ def fetch(symbol: str, period: str = "10y", interval: str = "1d") -> pd.DataFram
     return df
 
 
-def save_parquet(symbol: str, df: pd.DataFrame) -> Path:
+def save_parquet(symbol: str, df: pd.DataFrame, interval: str = "1d") -> Path:
     PARQUET_DIR.mkdir(parents=True, exist_ok=True)
-    p = _path(symbol)
+    p = _path(symbol, interval)
     df.to_parquet(p, index=False)
     return p
 
 
-def load_parquet(symbol: str) -> Optional[pd.DataFrame]:
-    p = _path(symbol)
+def load_parquet(symbol: str, interval: str = "1d") -> Optional[pd.DataFrame]:
+    p = _path(symbol, interval)
     if not p.exists():
         return None
     return pd.read_parquet(p)
@@ -68,12 +73,12 @@ def apply_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
     return df[pd.to_datetime(df["date"]) >= cutoff]
 
 
-def ensure_fresh(symbol: str, period: str = "10y") -> pd.DataFrame:
-    df = load_parquet(symbol)
+def ensure_fresh(symbol: str, period: str = "10y", interval: str = "1d") -> pd.DataFrame:
+    df = load_parquet(symbol, interval)
     needs_refresh = df is None or len(df) == 0
     if df is not None and len(df) > 0:
         latest = df["date"].max()
-        if (datetime.now() - pd.to_datetime(latest)).days > 2:
+        if (datetime.now() - pd.to_datetime(latest)).days > _staleness_days(interval):
             needs_refresh = True
         period_days = _period_days(period)
         if period_days is not None:
@@ -82,6 +87,6 @@ def ensure_fresh(symbol: str, period: str = "10y") -> pd.DataFrame:
             if cached_days < period_days - 10:
                 needs_refresh = True
     if needs_refresh:
-        df = fetch(symbol, period=period)
-        save_parquet(symbol, df)
+        df = fetch(symbol, period=period, interval=interval)
+        save_parquet(symbol, df, interval)
     return df  # type: ignore[return-value]
